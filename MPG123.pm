@@ -20,7 +20,7 @@ BEGIN { $^W=0 } # I'm fed up with bogus and unnecessary warnings nobody can turn
 @EXPORT = @_consts;
 @EXPORT_OK = @_funcs;
 %EXPORT_TAGS = (all => [@_consts,@_funcs], constants => \@_consts);
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 $MPG123 = "mpg123";
 
@@ -92,7 +92,7 @@ sub parse {
                      emphasis bitrate extension lsf)}=split /\s+/,$1;
          $self->{tpf} = ($self->{layer}>1 ? 1152 : 384) / $self->{samplerate};
          $self->{tpf} *= 0.5 if $self->{lsf};
-         $self->{state}=2;
+         $self->{state} = 2;
       } elsif ($line =~ /^\@I ID3:(.{30})(.{30})(.{30})(....)(.{30})(.*)$/) {
          $self->{title}=$1;   $self->{artist}=$2;
          $self->{album}=$3;   $self->{year}=$4;
@@ -102,7 +102,7 @@ sub parse {
          $self->{title}=$1;
          delete @{$self}{qw(artist album year comment genre)}
       } elsif ($line =~ /^\@P (\d+)$/) {
-         $self->{state}=$1;
+         $self->{state} = $1;
          # 0 = stopped, 1 = paused, 2 = continued
       } elsif ($line =~ /^\@E (.*)$/) {
          $self->{err}=$1;
@@ -125,20 +125,20 @@ sub poll {
 }
 
 sub canonicalize_url {
-   my $self=shift;
-   my $url=shift;
+   my $self = shift;
+   my $url = shift;
    if ($url !~ m%^http://%) {
-      $url=~s%^file://[^/]*/%%;
-      $url=fastcwd."/".$url unless $url =~ /^\//;
+      $url =~ s%^file://[^/]*/%%;
+      $url = fastcwd."/".$url unless $url =~ /^\//;
    }
    $url;
 }
 
 sub load {
-   my $self=shift;
-   my $url=$self->canonicalize_url(shift);
-   $self->{url}=$url;
-   if (!-f $url) {
+   my $self = shift;
+   my $url = $self->canonicalize_url(shift);
+   $self->{url} = $url;
+   if ($url !~ /^http:/ && !-f $url) {
       $self->{err} = "No such file or directory: $url";
       return ();
    }
@@ -150,7 +150,7 @@ sub load {
 }
 
 sub stat {
-   my $self=shift;
+   my $self = shift;
    return unless $self->{state};
    print {$self->{w}} "STAT\n";
    $self->parse(qr{^\@F},1);
@@ -160,6 +160,10 @@ sub pause {
    my $self=shift;
    print {$self->{w}} "PAUSE\n";
    $self->parse(qr{^\@P},1);
+}
+
+sub paused {
+   2 - $_[0]{state};
 }
 
 sub jump {
@@ -191,7 +195,7 @@ for my $field (qw(title artist album year comment genre state url
                   type layer samplerate mode mode_extension bpf
                   channels copyrighted error_protected title artist album
                   year comment genre emphasis bitrate extension)) {
-  *{$field} = sub { shift->{$field} };
+  *{$field} = sub { $_[0]{$field} };
 }
 
 sub error { shift->{err} }
@@ -210,7 +214,7 @@ Audio::Play::MPG123 - a frontend to mpg123 version 0.59r and beyond.
   $player = new Audio::Play::MPG123;
   $player->load("kult.mp3");
   print $player->artist,"\n";
-  $player->poll(1) until $player->stat == 0;
+  $player->poll(1) until $player->state == 0;
 
   $player->load("http://x.y.z/kult.mp3");
 
@@ -221,7 +225,22 @@ Audio::Play::MPG123 - a frontend to mpg123 version 0.59r and beyond.
 This is a frontend to the mpg123 player. It works by starting an external
 mpg123 process with the C<-R> option and feeding commands to it.
 
+While the standard mpg123 player can be used to play back mp3's using
+this module you will encounter random deadlocks, due to bugs in its
+communication code. Also, many features (like C<statfreq>) only work with
+the included copy of mpg123, so better use that one before deciding that
+this module is broken.
+
+(In case you wonder, the mpg123 author is not interested in including
+these fixes and enhancements into mpg123).
+
 =head2 METHODS
+
+Most methods can be either BLOCKING (they wait until they get an answer,
+which usually takes half a mpeg frame of playing time), NONBLOCKING (the
+functions return as soon as they send their message, which is usallly
+instant) or CACHING (the method returns some cached data which only gets
+refreshed by an asynchronous STAT event or an explicit call to C<state>).
 
 =over 4
 
@@ -229,26 +248,41 @@ mpg123 process with the C<-R> option and feeding commands to it.
 
 This creates a new player object and also starts the mpg123 process.
 
-=item load(<path or url>)
+=item load(<path or url>) [BLOCKING]
 
-Immediately loads the specified file (or url, http:// and file:// forms
-supported) and starts playing it.
+Immediately loads the specified file (or url, http:// and file:/// forms
+supported) and starts playing it. If you really want to play a file with
+a name starting with C<file://> or C<http://> then consider prefixing all
+your paths with C<file:///>.
 
-=item pause
+=item stat [BLOCKING]
 
-Pauses or unpauses the song. C<state> can be used to find out about the
-current mode.
+This can be used to poll the player for it's current state (playing mode,
+frame position &c). As every other function that requires communication
+with mpg123, it might take up to one frame delay until the answer returns.
+Using C<statfreq> and infrequent calls to C<poll> is often a better
+strategy.
 
-=item jump
+=item pause [BLOCKING]
+
+Pauses or unpauses the song. C<state> (or C<paused>) can be used to find
+out about the current mode.
+
+=item paused [CACHING]
+
+Returns the opposite of C<state>, i.e. zero when something is playing
+and non-zero when the player is stopped or paused.
+
+=item jump [BLOCKING]
 
 Jumps to the specified frame of the song. If the number is prefixed with
 "+" or "-", the jump is relative, otherweise it is absolute.
 
-=item stop
+=item stop [BLOCKING]
 
 Stops the currently playing song and unloads it.
 
-=item statfreq(rate)
+=item statfreq(rate) [NONBLOCKING]
 
 Sets the rate at which automatic frame updates are sent by mpg123. C<0>
 turns it off, everything else is the average number of frames between
@@ -256,9 +290,9 @@ updates.  This can be a floating pount value, i.e.
 
  $player->statfreq(0.5/$player->tpf);
 
-will set two updates per sond (one every half a second).
+will set two updates per second (one every half a second).
 
-=item state
+=item state [CACHING]
 
 Returns the current state of the player:
 
@@ -266,7 +300,7 @@ Returns the current state of the player:
  1  paused, song loaded but not playing
  2  playing, song loaded and playing
 
-=item poll(<wait>)
+=item poll(<wait>) [BLOCKING or NONBLOCKING]
 
 Parses all outstanding events and status information. If C<wait> is zero
 it will only parse as many messages as are currently in the queue, if it
@@ -276,13 +310,13 @@ This can be used to wait for the end of a song, for example. This function
 should be called regularly, since mpg123 will stop playing when it can't
 write out events because the perl program is no longer listening...
 
-=item title artist album year comment genre url type layer samplerate mode mode_extension bpf channels copyrighted error_protected title artist album year comment genre emphasis bitrate extension
+=item title artist album year comment genre url type layer samplerate mode mode_extension bpf channels copyrighted error_protected title artist album year comment genre emphasis bitrate extension [CACHING]
 
 These accessor functions return information about the loaded
 song. Information about the C<artist>, C<album>, C<year>, C<comment> or
 C<genre> might not be available and will be returned as C<undef>.
 
-=item tpf
+=item tpf [CACHING]
 
 Returns the "time per frame", i.e. the time in seconds for one frame. Useful with the C<jump>-method:
 
@@ -292,7 +326,7 @@ Jumps to second 60.
 
 =item IN
 
-returns the input filehandle from the mpg123 player. This can be used for selects() or poll().
+Returns the input filehandle from the mpg123 player. This can be used for selects() or poll().
 
 =back
 

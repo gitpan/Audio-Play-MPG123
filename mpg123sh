@@ -18,6 +18,28 @@ $|=1;
 
 do $RC;
 
+# contains tuples of the form [url, repeat]
+@playlist=();
+$p_url;
+$p_repeat;
+
+$player = new Audio::Play::MPG123;
+
+# do uri-style escaping PLUS escape space to · and back (sorry for that :()
+sub uri_esc($) {
+   local $_ = shift;
+   s/([^\x21-\x24\x26-\x7e\xa0-\xb6\xb8-\xff])/sprintf "%c%02x", 0x25, ord($1)/ge;
+   s/%20/·/g;
+   $_;
+}
+
+sub uri_unesc($) {
+   local $_ = shift;
+   s/·/%20/g;
+   s/%([0-9a-f][0-9a-f])/chr(hex($1))/gei;
+   $_;
+}
+
 sub write_rc {
    require Data::Dumper;
    print "writing $RC... ";
@@ -45,26 +67,11 @@ sub oconf {
    }
 }
 
-# do uri-style escaping PLUS escape space to · and back (sorry for that :()
-sub uri_esc($) {
-   local $_ = shift;
-   s/([^\x21-\x24\x26-\x7e\xa0-\xb6\xb8-\xff])/sprintf "%c%02x", 0x25, ord($1)/ge;
-   s/%20/·/g;
-   $_;
-}
-
-sub uri_unesc($) {
-   local $_ = shift;
-   s/·/%20/g;
-   s/%([0-9a-f][0-9a-f])/chr(hex($1))/gei;
-   $_;
-}
-
 sub mp3log {
    my ($cmd, @args) = @_;
    if (defined $conf{log}) {
       if (open LOG, ">>$conf{log}") {
-         print LOG "$cmd @args\n";
+         print LOG "$cmd ", (join " ", map uri_esc($_), @args), "\n";
          close LOG;
       } else {
          warn "$conf{log}: $!\n";
@@ -77,18 +84,89 @@ my $current_time;
 
 sub load_url {
    my $url = shift;
-   if (defined $current_url) {
+   if (defined $current_url && $current_time) {
       mp3log "T", $current_url, sprintf ("%0.2f", time - $current_time);
    }
    $current_url = $url;
    if (defined $url) {
       $current_time = time;
-      $player->load(uri_unesc($url));
+      $player->load($url);
    }
+}
+
+sub pause_url {
+   my $pause = shift;
+   if ($pause) {
+      mp3log "T", $current_url, sprintf ("%0.2f", time - $current_time) if defined $current_url;
+      $current_time = 0;
+   } else {
+      $current_time = time;
+   }
+}
+
+sub next_song {
+   if ($p_repeat <= 0 && @playlist) {
+      my $p = shift @playlist;
+      push @playlist, $p if $p;
+      $p_url    = $playlist[0][0];
+      $p_repeat = $playlist[0][1];
+   }
+   if ($p_url) {
+      $p_repeat--;
+      load_url($p_url);
+      mp3log("+", $p_url);
+      $player->stat;
+   }
+}
+
+sub add_url($) {
+   my $url = shift;
+   push @playlist, [$url, 1];
+   next_song unless $player->state;
+   mp3log("a", $url);
 }
 
 END {
    load_url();
+}
+
+sub file_completion {
+   File::Glob::glob "$_[0]*", GLOB_MARK|GLOB_TILDE;
+}
+
+sub mfav {
+   my ($cmd, $value) = @_;
+   if ($cmd eq "f" or $cmd eq "l") {
+      if (defined $conf{log}) {
+         my %time;
+         local *LOG;
+         open LOG, "<$conf{log}" and do {
+            while (<LOG>) {
+               if (/^[al] (\S+)/) {
+                  $time{$1} += 0.2;
+               } elsif (/^[ds] (\S+)/) {
+                  $time{$1} -= 0.2;
+               } elsif (/^T (\S+) (\S+)/) {
+                  $time{$1} += $2;
+               }
+            }
+         };
+         my @time;
+         while (my ($k, $v) = each %time) {
+            push @time, [$k, $v];
+         }
+         $value ||= 5;
+         for (sort { $b->[1] <=> $a->[1] } @time) {
+            printf "%10.2f %s\n", $_->[1], $_->[0];
+            add_url uri_unesc $_->[0] if $cmd eq "f";
+            last if --$value <= 0;
+         }
+      } else {
+         print "this command requires a logfile\n";
+      }
+   } else {
+      print "unknown m command, use <f> or <l>.\n";
+   }
 }
 
 $SIG{INT} =
@@ -104,32 +182,6 @@ sub Term::ReadLine::Tk::register_Tk { }
 $rl = new Term::ReadLine "mpg123sh";
 $rl->tkRunning(1);
 
-# contains tuples of the form [url, repeat]
-@playlist=();
-$p_url;
-$p_repeat;
-
-$player = new Audio::Play::MPG123;
-
-sub file_completion {
-   File::Glob::glob "$_[0]*", GLOB_MARK|GLOB_TILDE;
-}
-
-sub next_song {
-   if ($p_repeat<=0 && @playlist) {
-      my $p=shift @playlist;
-      push @playlist,$p if $p;
-      $p_url=$playlist[0][0];
-      $p_repeat=$playlist[0][1];
-   }
-   if ($p_url) {
-      $p_repeat--;
-      load_url($p_url);
-      mp3log("-", $p_url);
-      $player->stat;
-   }
-}
-
 $rl->Attribs->{completion_function} = sub {
    my($word,$line,$pos)=@_;
    $word ||= ""; $line ||= ""; $pos ||= 0;
@@ -143,6 +195,9 @@ $rl->Attribs->{completion_function} = sub {
       }
    }
    @r = file_completion uri_unesc($c);
+   if ($line =~ /^c/) {
+      @r = grep -d "$_/.", @r;
+   }
    if (@r == 1) {
       if (-f $r[0]) {
          $rl->Attribs->{completer_terminator_character}=" ";
@@ -168,15 +223,14 @@ sub event_loop {
    }
    do {
       next_song if $player->state == 0;
-      vec($r,fileno($rlin),1)=1;
-      vec($r,fileno($player->IN),1)=1;
-      select($r,undef,undef,undef);
-      $player->poll(1) if vec($r,fileno($player->IN),1);
-   } until vec($r,fileno($rlin),1);
+      vec($r, fileno($rlin), 1)       = 1;
+      vec($r, fileno($player->IN), 1) = 1;
+      select $r, undef, undef, undef;
+      $player->poll(0) if vec($r,fileno($player->IN),1);
+   } until vec($r, fileno($rlin), 1);
 }
 
-# roughly every two seconds in the normal case
-$player->statfreq(5);
+$player->statfreq(20);
 
 print "\nmpg123sh, version $Audio::Play::MPG123::VERSION\n";
 print "enter 'help' for a command list\n\n";
@@ -191,24 +245,25 @@ for(;;) {
    }
    $_=$rl->readline("$prompt> ");
    if (/^l(?:oad)?\s*(.*?)\s*$/i) {
-      my $url = $player->canonicalize_url($1);
+      my $url = $player->canonicalize_url(uri_unesc $1);
       load_url($url) or print "ERROR: ",$player->error,"\n";
       mp3log("l", $url);
       $player->stat;
    } elsif (/^a(?:dd)?\s*(.*?)\s*$/i) {
-      push(@playlist,[$player->canonicalize_url($1),1]);
-      next_song if $player->state == 0;
-      mp3log("a", $playlist[-1][0]);
+      for (File::Glob::glob uri_unesc $1, GLOB_TILDE|GLOB_NOMAGIC) {
+         add_url $player->canonicalize_url($_);
+      }
    } elsif (/^r(?:epeat)?\s*(\d+)\s*$/) {
       $playlist[-1][1] = $1;
    } elsif (/^p/i) {
       $player->pause;
+      pause_url ($player->paused);
    } elsif (/^d(?:el)?\s*(\d*)\s*$/i) {
       for (do {
          if ($1) {
             splice @playlist,$1-1,1;
          } else {
-            $p_repeat=0;
+            $p_repeat = 0;
             $player->stop;
             next_song;
             pop @playlist;
@@ -222,11 +277,13 @@ for(;;) {
       mp3log("s", $playlist[0][0]);
       next_song;
    } elsif (/^c(?:d)?\s*(.*?)\s*$/i) {
-      chdir $1 or print "Unable to change to '$1': $!\n";
+      chdir uri_unesc $1 or print "Unable to change to '$1': $!\n";
    } elsif (/^j(?:ump)?\s*([0-9.]+)\s*$/i) {
       eval { $player->jump(int($1/$player->tpf)) };
-   } elsif (/^o\s*(\w+)\s*(.*)/i) {
+   } elsif (/^o\s*([a-z]+)\s*(.*)/i) {
       oconf($1,$2);
+   } elsif (/^m\s*([a-z]+)\s*(.*)/i) {
+      mfav($1,$2);
    } elsif (/^q/i) {
       last;
    } elsif (/^i(nfo)?/i) {
@@ -267,6 +324,8 @@ help                   this listing
 o                      manipulate configuration
 o conf                 show current configuration
 o log <path>           log all playing actions into file <path>
+m                      playlist management (not much there, yet)
+m f <num>              add <num> favourite songs
 
 - most commands can be shortened to a one-letter form
 - most whitespace between command and arguments is optional

@@ -15,8 +15,6 @@ SECTION=1
 ######                                       ######
 ###################################################
 
-all: linux-esd
-
 nothing-specified:
 	@echo ""
 	@echo "You must specify the system which you want to compile for:"

@@ -1,5 +1,10 @@
 Revision history for Perl extension Audio::Play::MPG123
 
+0.05  Sat Jul 15 23:28:41 CEST 2000
+	- more small improvements & fixes in mpg123sh.
+        - new method 'paused'.
+        - fixed a bug that made broke http-url support.
+
 0.04  Fri Jun 23 08:03:01 CEST 2000
 	- fixed tpf, required a change in mpg123.
         - small improvements to mpg123sh, fixing the completion problem
