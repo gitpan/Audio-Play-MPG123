@@ -13,6 +13,7 @@ use Term::ReadLine;
 use Fcntl; # required by MPG123 anyway
 use Cwd;
 use File::Glob;
+use File::Basename;
 
 $|=1;
 
@@ -152,8 +153,14 @@ sub mfav {
             }
          };
          my @time;
+         my %base;
+         for (keys %time) {
+            next if -f uri_unesc $_;
+            my $base = basename $_;
+            $base{$base} += delete $time{$_};
+         }
          while (my ($k, $v) = each %time) {
-            push @time, [$k, $v];
+            push @time, [$k, $v + $base{basename $k}];
          }
          $value ||= 5;
          for (sort { $b->[1] <=> $a->[1] } @time) {
@@ -183,7 +190,7 @@ $rl = new Term::ReadLine "mpg123sh";
 $rl->tkRunning(1);
 
 $rl->Attribs->{completion_function} = sub {
-   my($word,$line,$pos)=@_;
+   my ($word,$line,$pos) = @_;
    $word ||= ""; $line ||= ""; $pos ||= 0;
    $p = "";
    $c = $word;
@@ -326,6 +333,7 @@ o conf                 show current configuration
 o log <path>           log all playing actions into file <path>
 m                      playlist management (not much there, yet)
 m f <num>              add <num> favourite songs
+m l <num>              list <num> favourite songs
 
 - most commands can be shortened to a one-letter form
 - most whitespace between command and arguments is optional

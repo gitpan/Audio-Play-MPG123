@@ -1,5 +1,10 @@
 Revision history for Perl extension Audio::Play::MPG123
 
+0.051 Fri Jul 21 04:13:35 CEST 2000
+	- fork()s no longer destroy the mpg123 process.
+        - mpg123sh accounts non-existant files to other
+          files with the same basename.
+
 0.05  Sat Jul 15 23:28:41 CEST 2000
 	- more small improvements & fixes in mpg123sh.
         - new method 'paused'.

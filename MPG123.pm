@@ -20,7 +20,7 @@ BEGIN { $^W=0 } # I'm fed up with bogus and unnecessary warnings nobody can turn
 @EXPORT = @_consts;
 @EXPORT_OK = @_funcs;
 %EXPORT_TAGS = (all => [@_consts,@_funcs], constants => \@_consts);
-$VERSION = '0.05';
+$VERSION = '0.051';
 
 $MPG123 = "mpg123";
 
@@ -33,33 +33,29 @@ sub new {
 }
 
 sub start_mpg123 {
-   my $self=shift;
-   $self->{r}=local *MPG123_READER;
-   $self->{w}=local *MPG123_WRITER;
-   $self->{pid}=open2($self->{r},$self->{w},$MPG123,'-R','--aggressive','-y','');
+   my $self = shift;
+   $self->{r} = local *MPG123_READER;
+   $self->{w} = local *MPG123_WRITER;
+   $self->{pid} = open2($self->{r},$self->{w},$MPG123,'-R','--aggressive','-y','');
    die "Unable to start $MPG123" unless $self->{pid};
-   fcntl $self->{r},F_SETFL,O_NONBLOCK;
+   fcntl $self->{r}, F_SETFL, O_NONBLOCK;
+   fcntl $self->{r}, F_SETFD, FD_CLOEXEC;
    $self->parse(qr/^\@R (\S+)/,1) or die "Error during player startup: $self->{err}\n";
    $self->{version}=$1;
 }
 
 sub stop_mpg123 {
-   my $self=shift;
+   my $self = shift;
    if (delete $self->{pid}) {
-      print {$self->{w}} "\nQ\n";
+      print {$self->{w}} "Q\n";
       close $self->{w};
       close $self->{r};
    }
 }
 
-sub DESTROY {
-   my $self=shift;
-   $self->stop_mpg123;
-}
-
 sub line {
-   my $self=shift;
-   my $wait=shift;
+   my $self = shift;
+   my $wait = shift;
    for(;;) {
       return $1 if $self->{buf} =~ s/^([^\n]*)\n+//;
       my $len = sysread $self->{r},$self->{buf},4096,length($self->{buf});
@@ -79,9 +75,9 @@ sub line {
 }
 
 sub parse {
-   my $self=shift;
-   my $re=shift;
-   my $wait=shift;
+   my $self = shift;
+   my $re   = shift;
+   my $wait = shift;
    while (my $line = $self->line ($wait)) {
       if ($line =~ /^\@F (.*)$/) {
          $self->{frame}=[split /\s+/,$1];
@@ -118,15 +114,15 @@ sub parse {
 }
 
 sub poll {
-   my $self=shift;
-   my $wait=shift;
+   my $self = shift;
+   my $wait = shift;
    $self->parse(qr//,1) if $wait;
    $self->parse(qr/^X\0/,0);
 }
 
 sub canonicalize_url {
    my $self = shift;
-   my $url = shift;
+   my $url  = shift;
    if ($url !~ m%^http://%) {
       $url =~ s%^file://[^/]*/%%;
       $url = fastcwd."/".$url unless $url =~ /^\//;
@@ -136,7 +132,7 @@ sub canonicalize_url {
 
 sub load {
    my $self = shift;
-   my $url = $self->canonicalize_url(shift);
+   my $url  = $self->canonicalize_url(shift);
    $self->{url} = $url;
    if ($url !~ /^http:/ && !-f $url) {
       $self->{err} = "No such file or directory: $url";
@@ -157,7 +153,7 @@ sub stat {
 }
 
 sub pause {
-   my $self=shift;
+   my $self = shift;
    print {$self->{w}} "PAUSE\n";
    $self->parse(qr{^\@P},1);
 }
@@ -167,17 +163,17 @@ sub paused {
 }
 
 sub jump {
-   my $self=shift;
+   my $self = shift;
    print {$self->{w}} "JUMP $_[0]\n";
 }
 
 sub statfreq {
-   my $self=shift;
+   my $self = shift;
    print {$self->{w}} "STATFREQ $_[0]\n";
 }
 
 sub stop {
-   my $self=shift;
+   my $self = shift;
    print {$self->{w}} "STOP\n";
    $self->parse(qr{^\@P},1);
 }
@@ -187,7 +183,7 @@ sub IN {
 }
 
 sub tpf {
-   my $self=shift;
+   my $self = shift;
    $self->{tpf};
 }
 
