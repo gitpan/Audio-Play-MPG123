@@ -28,7 +28,7 @@ do $RC;
 $p_url;
 $p_repeat;
 
-$player = new Audio::Play::MPG123;
+$player = new Audio::Play::MPG123 mpg123args => ["-b4096"];
 
 # do uri-style escaping PLUS escape space to · and back (sorry for that :()
 sub uri_esc($) {
@@ -287,6 +287,11 @@ for(;;) {
    } elsif (/^p/i) {
       $player->pause;
       pause_url ($player->paused);
+   } elsif (/^DD$/) {
+      $p_repeat = 0;
+      $player->stop;
+      next_song;
+      unlink @{pop @playlist}[0];
    } elsif (/^d(?:el)?\s*(\d*)\s*$/i) {
       for (do {
          if ($1) {
@@ -350,6 +355,7 @@ shuffle                shuffle currently selected songs once
 cd <path>              change current directory
 del <num>              remove song number <num> from the playlist
 del                    remove the currently playing song
+DD                     like del, but physically deleted the file(!!!)
 jump <second>          seek to the specified position
 repeat <count>         repeat the last recently added song <count times>
 help                   this listing

@@ -1,7 +1,7 @@
 /*
  * Control interface to generic front ends.
  * written/copyrights 1997/99 by Andreas Neuhaus (and Michael Hipp)
- * extensive bugfixes/changes by Marc Lehmann
+ * some bugfixes/changes by Marc Lehmann
  */
 
 #include <stdio.h>
@@ -40,6 +40,10 @@ void generic_sendmsg (char *fmt, ...)
 static double compute_bpf (struct frame *fr)
 {
     double bpf;
+    if(!fr->bitrate_index) {
+      return fr->freeformatsize + 4;
+    }
+
     switch(fr->lay) {
     case 1:
 	bpf = tabsel_123[fr->lsf][0][fr->bitrate_index];
@@ -104,7 +108,7 @@ void generic_sendstat (struct frame *fr, int no)
     tim1 = sno * tpf - dt;
     tim2 = rno * tpf + dt;
 
-    generic_sendmsg("F %d %d %3.2f %3.2f", sno, rno, tim1, tim2);
+    generic_sendmsg("F %d %d %3.2f %3.2f %ld", sno, rno, tim1, tim2, (long)(8.0*bpf/tpf));
 }
 
 extern char *genre_table[];

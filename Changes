@@ -1,5 +1,10 @@
 Revision history for Perl extension Audio::Play::MPG123
 
+0.63 Thu Mar  3 18:00:52 CET 2005
+	- updated to mpg123 2001-05-18.
+        - added new frame accessor method, patch by Steven Elling.
+        - change of contact address.
+
 0.62 Sun Feb  4 13:39:04 CET 2001
 	- implemented SHuffle command for mpg123sh.
 	- forgot to include playlist.h. However, mpg123

@@ -13,7 +13,6 @@ mpg123/BUGS
 mpg123/CHANGES
 mpg123/COPYING
 mpg123/INSTALL
-mpg123/JUKEBOX
 mpg123/Makefile
 mpg123/Makefile.win32
 mpg123/README
@@ -122,3 +121,4 @@ mpg123/version.h
 mpg123/wav.c
 mpg123/xfermem.c
 mpg123/xfermem.h
+META.yml                                 Module meta-data (added by MakeMaker)

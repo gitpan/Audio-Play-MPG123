@@ -20,7 +20,7 @@ BEGIN { $^W=0 } # I'm fed up with bogus and unnecessary warnings nobody can turn
 @EXPORT = @_consts;
 @EXPORT_OK = @_funcs;
 %EXPORT_TAGS = (all => [@_consts,@_funcs], constants => \@_consts);
-$VERSION = '0.62';
+$VERSION = '0.63';
 
 $MPG123 = "mpg123";
 
@@ -192,7 +192,7 @@ sub tpf {
 }
 
 for my $field (qw(title artist album year comment genre state url
-                  type layer samplerate mode mode_extension bpf
+                  type layer samplerate mode mode_extension bpf frame
                   channels copyrighted error_protected title artist album
                   year comment genre emphasis bitrate extension)) {
   *{$field} = sub { $_[0]{$field} };
@@ -314,11 +314,15 @@ This can be used to wait for the end of a song, for example. This function
 should be called regularly, since mpg123 will stop playing when it can't
 write out events because the perl program is no longer listening...
 
-=item title artist album year comment genre url type layer samplerate mode mode_extension bpf channels copyrighted error_protected title artist album year comment genre emphasis bitrate extension [CACHING]
+=item title artist album year comment genre url type layer samplerate mode mode_extension bpf frame channels copyrighted error_protected title artist album year comment genre emphasis bitrate extension [CACHING]
 
 These accessor functions return information about the loaded
 song. Information about the C<artist>, C<album>, C<year>, C<comment> or
 C<genre> might not be available and will be returned as C<undef>.
+
+The accessor function C<frame> returns a reference to an array containing
+the frames played, frames left, seconds played, and seconds left in this
+order. Seconds are returned as floating point numbers.
 
 =item tpf [CACHING]
 
@@ -336,7 +340,7 @@ Returns the input filehandle from the mpg123 player. This can be used for select
 
 =head1 AUTHOR
 
-Marc Lehmann <pcg@goof.com>.
+Marc Lehmann <schmorp@schmorp.de>.
 
 =head1 SEE ALSO
 
