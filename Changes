@@ -1,5 +1,11 @@
 Revision history for Perl extension Audio::Play::MPG123
 
+0.03
+	- bug fixes, many of them to mpg123.
+        - removed opts method, implemented statfreq method instead.
+        - added tpf method.
+        - implemented "d" and "j" commands, many small improvements.
+
 0.02  Wed Jun 23 21:14:29 CEST 1999
 	- first release.
 

@@ -81,23 +81,27 @@ void generic_sendstat (struct frame *fr, int no)
 
 	buffsize = xfermem_get_usedspace(buffermem);
 	if (!rd || !fr)
-		return;
-	bpf = compute_bpf(fr);
-	tpf = compute_tpf(fr);
-	if (buffsize > 0 && ai.rate > 0 && ai.channels > 0) {
-		dt = (double) buffsize / ai.rate / ai.channels;
-		if ((ai.format & AUDIO_FORMAT_MASK) == AUDIO_FORMAT_16)
-			dt *= .5;
-	}
-	rno = 0;
-	sno = no;
-	if (rd->filelen >= 0) {
-		long t = rd->tell(rd);
-		rno = (int)((double)(rd->filelen-t)/bpf);
-		sno = (int)((double)t/bpf);
-	}
-	tim1 = sno * tpf - dt;
-	tim2 = rno * tpf + dt;
+          {
+            generic_sendmsg("F");
+            return;
+          }
+
+        bpf = compute_bpf(fr);
+        tpf = compute_tpf(fr);
+        if (buffsize > 0 && ai.rate > 0 && ai.channels > 0) {
+                dt = (double) buffsize / ai.rate / ai.channels;
+                if ((ai.format & AUDIO_FORMAT_MASK) == AUDIO_FORMAT_16)
+                        dt *= .5;
+        }
+        rno = 0;
+        sno = no;
+        if (rd->filelen >= 0) {
+                long t = rd->tell(rd);
+                rno = (int)((double)(rd->filelen-t)/bpf);
+                sno = (int)((double)t/bpf);
+        }
+        tim1 = sno * tpf - dt;
+        tim2 = rno * tpf + dt;
 
 	generic_sendmsg("F %d %d %3.2f %3.2f", sno, rno, tim1, tim2);
 }
@@ -138,7 +142,7 @@ void control_generic (struct frame *fr)
 	int mode = MODE_STOPPED;
 	int init = 0;
 	int framecnt = 0;
-        int opts = 1;
+        float statcnt = 0, statfreq = 1;
 
         setvbuf (stdout, 0, _IOLBF, 0);
 	printf("@R MPG123-p\n");
@@ -175,11 +179,17 @@ void control_generic (struct frame *fr)
 						tabsel_123[fr->lsf][fr->lay-1][fr->bitrate_index],
 						fr->extension);
 					init = 0;
+				        generic_sendstat(fr, framecnt);
+                                        statcnt = 0;
 				}
 				framecnt++;
+                                statcnt++;
 
-                                if (opts & 1)
-					generic_sendstat(fr, framecnt);
+                                if (statfreq && statcnt >= statfreq)
+                                  {
+                                    statcnt -= statfreq;
+				    generic_sendstat(fr, framecnt);
+                                  }
 			}
 		}
 		else {
@@ -199,28 +209,20 @@ void control_generic (struct frame *fr)
 
 		/* process command */
 		if (n > 0) {
-			int len;
+			int len,res;
 			char buf[1024];
 			char *cmd;
 
 			/* read command */
-			len = read(STDIN_FILENO, buf, sizeof(buf)-1);
-                        if (len <= 0)
-                          break;
+                        len = -1;
+                        do {
+                          len++;
+                          res = read(STDIN_FILENO, buf+len, 1);
+                          if (res == 0 || (res < 0 && errno != EAGAIN && errno != EINTR))
+                            goto end;
+                        } while (buf[len] != '\012' && buf[len] != '\015');
 
 			buf[len] = 0;
-
-			/* exit on error */
-			if (len < 0) {
-				fprintf(stderr, "Error reading command: %s\n", strerror(errno));
-				exit(1);
-			}
-
-			/* strip CR/LF at EOL */
-			while (len>0 && (buf[strlen(buf)-1] == '\n' || buf[strlen(buf)-1] == '\r')) {
-				buf[strlen(buf)-1] = 0;
-				len--;
-			}
 
 			/* continue if no command */
 			if (len == 0)
@@ -254,9 +256,8 @@ void control_generic (struct frame *fr)
 			}
 
 			/* OPTS */
-			if (!strcasecmp(cmd, "O") || !strcasecmp(cmd, "OPTS")) {
-                                opts = atol (strtok (NULL, ""));
-                                generic_sendmsg ("O %d", opts);
+			if (!strcasecmp(cmd, "STATFREQ")) {
+                                statfreq = atof (strtok (NULL, ""));
 				continue;
 			}
 
@@ -335,6 +336,7 @@ void control_generic (struct frame *fr)
 
 		}
 	}
+end:
 
 	/* quit gracefully */
 	if (param.usebuffer) {

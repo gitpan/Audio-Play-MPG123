@@ -144,7 +144,7 @@ linux-esd:
 			audio_esd.o' \
 		CFLAGS='-DI386_ASSEM -DREAL_IS_FLOAT -DPENTIUM_OPT -DLINUX \
 			-DREAD_MMAP -DOSS -DUSE_ESD \
-			-Wall  -O6 -mpentiumpro \
+			-Wall  -O6 -g -mpentiumpro \
                         -I/usr/app/include \
 			-fomit-frame-pointer -funroll-all-loops -D__NO_STRING_INLINES -D__NO_MATH_INLINES  \
 			-finline-functions \

@@ -28,11 +28,16 @@ DESCRIPTION
 
 INSTALLATION
 
-  Get your hands on a suitable mpg123 player (version 0.59r and above
-  should be fine, but the included version is better because it uses less
-  resources and has a few bugs fixed). Look in the subdirectory mpg123/,
-  compile the mpg123 binary and put it somewhere in your path, or edit the
-  variable $MPG123 in the file MPG123.pm to point to its location.
+  Get your hands on a suitable mpg123 player. While version 0.59r or
+  above should work, it uses more resources and contains many bugs
+  (frequent deadlocks or worse), so I recommend to use the included
+  version instead, which has many bugfixes and some enhancements (notably
+  irix 6.2 support).
+
+  In short: look in the subdirectory mpg123/, compile the mpg123 binary
+  and put it somewhere in your path or edit the variable $MPG123 in the
+  file MPG123.pm to point to its location.
+
 
 
 

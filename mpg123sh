@@ -91,7 +91,8 @@ sub event_loop {
    } until vec($r,fileno($rlin),1);
 }
 
-$player->opts(0);
+# roughly every two seconds in the normal case
+$player->statfreq(5);
 
 print "\nmpg123sh, version $Audio::Play::MPG123::VERSION\n";
 print "enter 'help' for a command list\n\n";
@@ -109,29 +110,45 @@ for(;;) {
       $player->load($1) or print "ERROR: ",$player->error,"\n";
       $player->stat;
    } elsif (/^a(?:dd)?\s*(.*?)\s*$/i) {
-      push(@playlist,[$1,1]);
+      push(@playlist,[$player->canonicalize_url($1),1]);
       next_song if $player->state == 0;
    } elsif (/^r(?:epeat)?\s*(\d+)\s*$/) {
       $playlist[-1][1] = $1;
    } elsif (/^p/i) {
       $player->pause;
-   } elsif (/^d(?:el)?\s*(\d+)\s*$/i) {
-      splice @playlist,$1-1,1;
+   } elsif (/^d(?:el)?\s*(\d*)\s*$/i) {
+      if ($1) {
+         splice @playlist,$1-1,1;
+      } else {
+         $p_repeat=0;
+         $player->stop;
+         next_song;
+         pop @playlist;
+      }
    } elsif (/^s/i) {
       $p_repeat=0;
       $player->stop;
       next_song;
    } elsif (/^c(?:d)?\s*(.*?)\s*$/i) {
       chdir $1 or print "Unable to change to '$1': $!\n";
+   } elsif (/^j(?:ump)?\s*([0-9.]+)\s*$/i) {
+      eval { $player->jump(int($1/$player->tpf)) };
    } elsif (/^q/i) {
       last;
    } elsif (/^i(nfo)?/i) {
       print "\n";
       if ($player->state) {
          print "currently playing: ",$player->url,"\n";
-         printf "title:   %-30s artist: %-30s\n",$player->title,$player->artist;
-         printf "album:   %-30s year:   %-30s\n",$player->album,$player->year;
-         printf "comment: %-30s genre:  %-30s\n",$player->comment,$player->genre;
+         printf "title:   %-32s artist: %-30s\n",$player->title,$player->artist;
+         printf "album:   %-32s year:   %-30s\n",$player->album,$player->year;
+         printf "comment: %-32s genre:  %-30s\n",$player->comment,$player->genre;
+         print "\n";
+         printf "MPEG %s layer %s, %d samples/s, %s, mode_extension is %d, %d bytes/frame\n".
+                "%d channels, %s, %s, emphasis is %s, %d kbit/s\n",
+                "I" x $player->type, $player->layer, $player->samplerate, $player->mode, $player->mode_extension,
+                $player->bpf, $player->channels, $player->copyrighted ? "copyrighted" : "not copyrighted",
+                $player->error_protected ? "error protection" : "no error protection", $player->emphasis ? "on" : "off",
+                $player->bitrate;
          print "\n";
       }
       for (my $i=0; $i<=$#playlist; $i++) {
@@ -149,6 +166,8 @@ pause                  pause/unpause
 stop                   stop current song (and play next)
 cd <path>              change current directory
 del <num>              remove song number <num> from the playlist
+del                    remove the currently playing song
+jump <second>          seek to the specified position
 repeat <count>         repeat the last recently added song <count times>
 help                   this listing
 

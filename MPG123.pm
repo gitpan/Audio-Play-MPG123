@@ -8,6 +8,7 @@ use Fcntl;
 use IPC::Open2;
 use Cwd;
 use File::Spec;
+use Errno qw(EAGAIN EINTR);
 
 BEGIN { $^W=0 } # I'm fed up with bogus and unnecessary warnings nobody can turn off.
 
@@ -19,7 +20,7 @@ BEGIN { $^W=0 } # I'm fed up with bogus and unnecessary warnings nobody can turn
 @EXPORT = @_consts;
 @EXPORT_OK = @_funcs;
 %EXPORT_TAGS = (all => [@_consts,@_funcs], constants => \@_consts);
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 $MPG123 = "mpg123";
 
@@ -59,10 +60,14 @@ sub DESTROY {
 sub line {
    my $self=shift;
    my $wait=shift;
-   my $line;
    for(;;) {
-      return $1 if $self->{buf} =~ s/^([^\r\n]*)[\r\n]+//;
-      if (sysread ($self->{r},$self->{buf},4096,length($self->{buf})) <= 0) {
+      return $1 if $self->{buf} =~ s/^([^\n]*)\n+//;
+      my $len = sysread $self->{r},$self->{buf},4096,length($self->{buf});
+      # collapse out the most frequent event, very useful for slow machines
+      $self->{buf} =~ s/^(?:\@F[^\n]*\n)+(?=\@F)//s;
+      if (defined $len || ($! != EAGAIN && $! != EINTR)) {
+         die "connection to mpg123 process lost: $!\n" if $len == 0;
+      } else {
          if ($wait) {
             my $v = ""; vec($v,fileno($self->{r}),1)=1;
             select ($v, undef, undef, 60);
@@ -84,7 +89,7 @@ sub parse {
       } elsif ($line =~ /^\@S (.*)$/) {
          @{$self}{qw(type layer samplerate
                      mode mode_extension
-                     framesize channels
+                     bpf channels
                      copyrighted error_protected
                      emphasis bitrate extension)}=split /\s+/,$1;
          $self->{state}=2;
@@ -98,9 +103,6 @@ sub parse {
          delete @{$self}{qw(artist album year comment genre)}
       } elsif ($line =~ /^\@P (\d+)$/) {
          $self->{state}=$1;
-         # 0 = stopped, 1 = paused, 2 = continued
-      } elsif ($line =~ /^\@O (\d+)$/) {
-         $self->{opts}=$1;
          # 0 = stopped, 1 = paused, 2 = continued
       } elsif ($line =~ /^\@E (.*)$/) {
          $self->{err}=$1;
@@ -122,20 +124,26 @@ sub poll {
    $self->parse(qr/^X\0/,0);
 }
 
-sub load {
+sub canonicalize_url {
    my $self=shift;
    my $url=shift;
    if ($url !~ m%^http://%) {
       $url=~s%^file://[^/]*/%%;
       $url=fastcwd."/".$url unless $url =~ /^\//;
-      if (!-f $url) {
-         $self->{err} = "No such file or directory: $url";
-         return ();
-      }
    }
+   $url;
+}
+
+sub load {
+   my $self=shift;
+   my $url=$self->canonicalize_url(shift);
    $self->{url}=$url;
+   if (!-f $url) {
+      $self->{err} = "No such file or directory: $url";
+      return ();
+   }
    print {$self->{w}} "LOAD $url\n";
-   delete @{$self}{qw(frame type layer samplerate mode mode_extension framesize
+   delete @{$self}{qw(frame type layer samplerate mode mode_extension bpf
                       channels copyrighted error_protected title artist album
                       year comment genre emphasis bitrate extension)};
    return $self->parse(qr{^\@S\s},1);
@@ -144,7 +152,7 @@ sub load {
 sub stat {
    my $self=shift;
    return unless $self->{state};
-   print {$self->{w}} "STAT $url\n";
+   print {$self->{w}} "STAT\n";
    $self->parse(qr{^\@F},1);
 }
 
@@ -159,9 +167,9 @@ sub jump {
    print {$self->{w}} "JUMP $_[0]\n";
 }
 
-sub opts {
+sub statfreq {
    my $self=shift;
-   print {$self->{w}} "OPTS $_[0]\n";
+   print {$self->{w}} "STATFREQ $_[0]\n";
 }
 
 sub stop {
@@ -174,8 +182,13 @@ sub IN {
    $_[0]->{r};
 }
 
+sub tpf {
+   my $self=shift;
+   ($self->{layer}>1 ? 1152 : 384) / $self->{samplerate};
+}
+
 for my $field (qw(title artist album year comment genre state url
-                  type layer samplerate mode mode_extension framesize
+                  type layer samplerate mode mode_extension bpf
                   channels copyrighted error_protected title artist album
                   year comment genre emphasis bitrate extension)) {
   *{$field} = sub { shift->{$field} };
@@ -235,10 +248,15 @@ Jumps to the specified frame of the song. If the number is prefixed with
 
 Stops the currently playing song and unloads it.
 
-=item opts(<flags>)
+=item framerate(rate)
 
-Sets various flags. At the moment, only "1" or "0" is supported, which
-enables or disabled automatic position reports.
+Sets the rate at which automatic frame updates are sent by mpg123. C<0>
+turns it off, everything else is the average number of frames between
+updates.  This can be a floating pount value, i.e.
+
+ $player->framerate (0.5/$player->tpf);
+
+will set two updates per sond (one every half a second).
 
 =item state
 
@@ -258,11 +276,19 @@ This can be used to wait for the end of a song, for example. This function
 should be called regularly, since mpg123 will stop playing when it can't
 write out events because the perl program is no longer listening...
 
-=item title artist album year comment genre url type layer samplerate mode mode_extension framesize channels copyrighted error_protected title artist album year comment genre emphasis bitrate extension
+=item title artist album year comment genre url type layer samplerate mode mode_extension bpf channels copyrighted error_protected title artist album year comment genre emphasis bitrate extension
 
 These accessor functions return information about the loaded
 song. Information about the C<artist>, C<album>, C<year>, C<comment> or
 C<genre> might not be available and will be returned as C<undef>.
+
+=item tpf
+
+Returns the "time per frame", i.e. the time in seconds for one frame. Useful with the C<jump>-method:
+
+ $player->jump (60/$player->tpf);
+
+Jumps to second 60.
 
 =item IN
 
