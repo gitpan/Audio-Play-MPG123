@@ -15,3 +15,19 @@ WriteMakefile(
     'DEFINE'	=> '',
     'INC'	=> '',
 );
+
+print <<EOF;
+
+**************************************************************************
+*                                                                        *
+* Audio::Play::MPG123 is now configured.                                 *
+*                                                                        *
+* Remember to compile the mpg123 binary that is included in the          *
+* distribution in the subdirectory mpg123/                               *
+*                                                                        *
+* Enter "look Audio::Play::MPG123" from the CPAN prompt to get to the    *
+* distribution directory.                                                *
+*                                                                        *
+**************************************************************************
+
+EOF

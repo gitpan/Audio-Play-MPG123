@@ -5,7 +5,7 @@ use Carp;
 
 require Exporter;
 use Fcntl;
-use IPC::Open2;
+use IPC::Open3;
 use Cwd;
 use File::Spec;
 use Errno qw(EAGAIN EINTR);
@@ -20,7 +20,7 @@ BEGIN { $^W=0 } # I'm fed up with bogus and unnecessary warnings nobody can turn
 @EXPORT = @_consts;
 @EXPORT_OK = @_funcs;
 %EXPORT_TAGS = (all => [@_consts,@_funcs], constants => \@_consts);
-$VERSION = '0.61';
+$VERSION = '0.62';
 
 $MPG123 = "mpg123";
 
@@ -35,9 +35,11 @@ sub new {
 
 sub start_mpg123 {
    my $self = shift;
+   local *DEVNULL;
+   open DEVNULL, ">/dev/null" or die "/dev/null: $!";
    $self->{r} = local *MPG123_READER;
    $self->{w} = local *MPG123_WRITER;
-   $self->{pid} = open2($self->{r},$self->{w},$MPG123,'-R','--aggressive',@_,'');
+   $self->{pid} = open3($self->{w},$self->{r},">&DEVNULL",$MPG123,'-R','--aggressive',@_,'');
    die "Unable to start $MPG123" unless $self->{pid};
    fcntl $self->{r}, F_SETFL, O_NONBLOCK;
    fcntl $self->{r}, F_SETFD, FD_CLOEXEC;

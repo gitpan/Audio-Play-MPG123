@@ -13,8 +13,11 @@ use Audio::Play::MPG123;
 use Term::ReadLine;
 use Fcntl; # required by MPG123 anyway
 use Cwd;
-use File::Glob;
 use File::Basename;
+
+sub mglob {
+   eval { require File::Glob } ? &File::Glob::glob : glob $_[0];
+}
 
 $|=1;
 
@@ -128,12 +131,19 @@ sub add_url($) {
    mp3log("a", $url);
 }
 
+sub shuffle {
+   for (my $i = @playlist; $i--; ) {
+      my $j = int rand $i+1;
+      @playlist[$j, $i] = @playlist[$i, $j];
+   }
+}
+
 END {
    load_url();
 }
 
 sub file_completion {
-   File::Glob::glob "$_[0]*", GLOB_MARK|GLOB_TILDE;
+   mglob "$_[0]*", GLOB_MARK|GLOB_TILDE;
 }
 
 sub mfav {
@@ -269,7 +279,7 @@ for(;;) {
       mp3log("l", $url);
       $player->stat;
    } elsif (/^a(?:dd)?\s*(.*?)\s*$/i) {
-      for (File::Glob::glob uri_unesc $1, GLOB_TILDE|GLOB_NOMAGIC) {
+      for (mglob uri_unesc $1, GLOB_TILDE|GLOB_NOMAGIC) {
          add_url $player->canonicalize_url($_);
       }
    } elsif (/^r(?:epeat)?\s*(\d+)\s*$/) {
@@ -290,6 +300,8 @@ for(;;) {
       }) {
          mp3log("d", $_->[0]);
       }
+   } elsif (/^sh/i) {
+      shuffle;
    } elsif (/^s/i) {
       $p_repeat=0;
       $player->stop;
@@ -334,6 +346,7 @@ quit                   quits the program
 info                   print information about the song and the playlist.
 pause                  pause/unpause
 stop                   stop current song (and play next)
+shuffle                shuffle currently selected songs once
 cd <path>              change current directory
 del <num>              remove song number <num> from the playlist
 del                    remove the currently playing song

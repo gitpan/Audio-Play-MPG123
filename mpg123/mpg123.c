@@ -875,7 +875,10 @@ static int control_default(struct mpstr *mp, struct frame *fr, struct playlist *
 
 	    init = 1;
 	    newFrame = param.startFrame;
-	    term_init();
+
+            if (param.term_ctrl)
+	        term_init();
+
 	    leftFrames = numframes;
 	    for(frameNum=0;read_frame(rd,fr) && leftFrames && !intflag;frameNum++) {
 #ifdef TERM_CONTROL			

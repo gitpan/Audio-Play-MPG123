@@ -1,5 +1,13 @@
 Revision history for Perl extension Audio::Play::MPG123
 
+0.62 Sun Feb  4 13:39:04 CET 2001
+	- implemented SHuffle command for mpg123sh.
+	- forgot to include playlist.h. However, mpg123
+          is being used by somebody so this kind of bug gets found ;)
+	- mpg123's stderr is now redirected to /dev/null.
+        - mpg123sh no longer depends on File::Glob.
+        - mpg123 no longer destroys your terminal settings.
+
 0.61 Thu Jan 18 19:46:45 CET 2001
 	- load now returns even whent he song couldn't be started :)
         - mpg123 is now started without the "-y" flag, since this
