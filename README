@@ -1,0 +1,38 @@
+NAME
+
+  Audio::Play::Play::MPG123 - generic frontend for mpg123
+
+SYNOPSIS
+
+  use Audio::Play::MPG123;
+  
+  $player = new Audio::Play::MPG123;
+  $player->load("kult.mp3");
+  print $player->artist,"\n";
+  $player->poll(1) until $player->stat == 0;
+
+  $player->load("http://x.y.z/kult.mp3");
+
+  # see also mpg123sh from the tarball
+
+DESCRIPTION
+
+  This distribution contains a module that can be used to control an
+  mpg123 process and a sample application that implements a "mp3 player
+  shell" on top of it.
+
+  I wrote it because I really hate all these nifty frontend that take
+  sparse desktop space. Xmms came close, but I couldn't get it to work
+  (xmms, not the pelr interface module), so I wrote my own wrapper around
+  mpg123.
+
+INSTALLATION
+
+  Get your hands on a suitable mpg123 player (version 0.59r and above
+  should be fine, but the included version is better because it uses less
+  resources and has a few bugs fixed). Look in the subdirectory mpg123/,
+  compile the mpg123 binary and put it somewhere in your path, or edit the
+  variable $MPG123 in the file MPG123.pm to point to its location.
+
+
+

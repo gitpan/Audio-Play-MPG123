@@ -1,0 +1,164 @@
+#!/usr/bin/perl
+
+# most of this file is dedicated to work around the braindead ReadLine
+# implementation.
+
+BEGIN { $ENV{PERL_RL} |= "Perl o=0" };
+
+use Audio::Play::MPG123;
+use Term::ReadLine;
+use Fcntl; # required by MPG123 anyway
+use Cwd;
+
+# terribly fool the Term::ReadLine packages..
+sub Tk::DoOneEvent { }
+sub Term::ReadLine::Tk::Tk_loop { &event_loop }
+sub Term::ReadLine::Tk::register_Tk { }
+
+$rl = new Term::ReadLine "mpg123sh";
+$rl->tkRunning(1);
+
+$|=1;
+
+# contains tuples of the form [url, repeat]
+@playlist=();
+$p_url;
+$p_repeat;
+
+$player = new Audio::Play::MPG123;
+
+sub file_completion {
+   glob "$_[0]*";
+}
+
+sub next_song {
+   if ($p_repeat<=0 && @playlist) {
+      my $p=shift @playlist;
+      push @playlist,$p if $p;
+      $p_url=$playlist[0][0];
+      $p_repeat=$playlist[0][1];
+   }
+   if ($p_url) {
+      $p_repeat--;
+      $player->load($p_url);
+      $player->stat;
+   }
+}
+
+$rl->Attribs->{completion_function} = sub {
+   my($word,$line,$pos)=@_;
+   $word ||= ""; $line ||= ""; $pos ||= 0;
+   $p = "";
+   $c = $word;
+   $rl->Attribs->{completer_terminator_character}="";
+   if ($pos==0) {
+      if ($word=~/^(l(?:oad)?|a(?:dd)?|cd?)(\S.*)?/) {
+         $p = $1." ";
+         $c = $2;
+      }
+   }
+   @r = file_completion $c;
+   if (@r == 1) {
+      if (-f $r[0]) {
+         $rl->Attribs->{completer_terminator_character}=" ";
+      } elsif (-d $r[0]) {
+         $rl->Attribs->{completer_terminator_character}="/";
+      }
+   }
+   @r=map "$p$_",@r;
+   #print "\n<$word|$line|$pos> = ",join(":",@r)," #",scalar@r,"\n";
+   @r;
+};
+
+sub event_loop {
+   my $r;
+   my $rlin = $rl->IN;
+   # most ugly workaround for perl-readline bug
+   if ($rl->ReadLine eq "Term::ReadLine::Perl") {
+      require IO::Handle;
+      my $o = (fcntl $rlin,F_GETFL,0) & (O_APPEND | O_NONBLOCK);
+      fcntl $rlin,F_SETFL,$o | O_NONBLOCK;
+      my $eof = eof($rlin);
+      fcntl $rlin,F_SETFL,$o;
+      return unless $eof;
+   }
+   do {
+      next_song if $player->state == 0;
+      vec($r,fileno($rlin),1)=1;
+      vec($r,fileno($player->IN),1)=1;
+      select($r,undef,undef,undef);
+      $player->poll(1) if vec($r,fileno($player->IN),1);
+   } until vec($r,fileno($rlin),1);
+}
+
+$player->opts(0);
+
+print "\nmpg123sh, version $Audio::Play::MPG123::VERSION\n";
+print "enter 'help' for a command list\n\n";
+
+for(;;) {
+   my $prompt=fastcwd." ";
+   if ($player->state) {
+      $player->stat;
+      $prompt.=$player->title." ".$player->{frame}[2]."/".($player->{frame}[2]+$player->{frame}[3]);
+   } else {
+      $prompt.=$p_url;
+   }
+   $_=$rl->readline("$prompt> ");
+   if (/^l(?:oad)?\s*(.*?)\s*$/i) {
+      $player->load($1) or print "ERROR: ",$player->error,"\n";
+      $player->stat;
+   } elsif (/^a(?:dd)?\s*(.*?)\s*$/i) {
+      push(@playlist,[$1,1]);
+      next_song if $player->state == 0;
+   } elsif (/^r(?:epeat)?\s*(\d+)\s*$/) {
+      $playlist[-1][1] = $1;
+   } elsif (/^p/i) {
+      $player->pause;
+   } elsif (/^d(?:el)?\s*(\d+)\s*$/i) {
+      splice @playlist,$1-1,1;
+   } elsif (/^s/i) {
+      $p_repeat=0;
+      $player->stop;
+      next_song;
+   } elsif (/^c(?:d)?\s*(.*?)\s*$/i) {
+      chdir $1 or print "Unable to change to '$1': $!\n";
+   } elsif (/^q/i) {
+      last;
+   } elsif (/^i(nfo)?/i) {
+      print "\n";
+      if ($player->state) {
+         print "currently playing: ",$player->url,"\n";
+         printf "title:   %-30s artist: %-30s\n",$player->title,$player->artist;
+         printf "album:   %-30s year:   %-30s\n",$player->album,$player->year;
+         printf "comment: %-30s genre:  %-30s\n",$player->comment,$player->genre;
+         print "\n";
+      }
+      for (my $i=0; $i<=$#playlist; $i++) {
+         printf "%2d: %-30s repeat %d\n",$i+1,"'$playlist[$i][0]'",$playlist[$i][1];
+      }
+      print "\n";
+   } elsif (/^h(help)?/i) {
+      print <<EOF;
+
+load <file or url>     loads the specified file and plays it immediately.
+add <file or url>      pushes the specified song to the end of the playlist
+quit                   quits the program
+info                   print information about the song and the playlist.
+pause                  pause/unpause
+stop                   stop current song (and play next)
+cd <path>              change current directory
+del <num>              remove song number <num> from the playlist
+repeat <count>         repeat the last recently added song <count times>
+help                   this listing
+
+- most commands can be shortened to a one-letter form
+- any whitespace between command and arguments is optional
+
+EOF
+   } elsif (/\S/) {
+      print "unknown command, try 'help'\n";
+   }
+}
+
+
