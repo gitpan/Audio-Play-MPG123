@@ -1,5 +1,10 @@
 Revision history for Perl extension Audio::Play::MPG123
 
+0.61 Thu Jan 18 19:46:45 CET 2001
+	- load now returns even whent he song couldn't be started :)
+        - mpg123 is now started without the "-y" flag, since this
+          also disables id3-tag-detection.
+
 0.6  Wed Jan 17 10:49:33 CET 2001
 	- updated to version 2001-01-17 of mpg123. Left out a lot
           of my patches (e.g. IRIX6). tell me if you need them.

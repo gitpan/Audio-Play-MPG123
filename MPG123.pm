@@ -20,7 +20,7 @@ BEGIN { $^W=0 } # I'm fed up with bogus and unnecessary warnings nobody can turn
 @EXPORT = @_consts;
 @EXPORT_OK = @_funcs;
 %EXPORT_TAGS = (all => [@_consts,@_funcs], constants => \@_consts);
-$VERSION = '0.052';
+$VERSION = '0.61';
 
 $MPG123 = "mpg123";
 
@@ -37,7 +37,7 @@ sub start_mpg123 {
    my $self = shift;
    $self->{r} = local *MPG123_READER;
    $self->{w} = local *MPG123_WRITER;
-   $self->{pid} = open2($self->{r},$self->{w},$MPG123,'-R','--aggressive','-y',@_,'');
+   $self->{pid} = open2($self->{r},$self->{w},$MPG123,'-R','--aggressive',@_,'');
    die "Unable to start $MPG123" unless $self->{pid};
    fcntl $self->{r}, F_SETFL, O_NONBLOCK;
    fcntl $self->{r}, F_SETFD, FD_CLOEXEC;
@@ -60,7 +60,7 @@ sub line {
    while() {
       return $1 if $self->{buf} =~ s/^([^\n]*)\n+//;
       my $len = sysread $self->{r},$self->{buf},4096,length($self->{buf});
-      # collapse out the most frequent event, very useful for slow machines
+      # telescope the most frequent event, very useful for slow machines
       $self->{buf} =~ s/^(?:\@F[^\n]*\n)+(?=\@F)//s;
       if (defined $len || ($! != EAGAIN && $! != EINTR)) {
          die "connection to mpg123 process lost: $!\n" if $len == 0;
@@ -143,7 +143,8 @@ sub load {
    delete @{$self}{qw(frame type layer samplerate mode mode_extension bpf lsf
                       channels copyrighted error_protected title artist album
                       year comment genre emphasis bitrate extension)};
-   return $self->parse(qr{^\@S\s},1);
+   $self->parse(qr{^\@[SP]\s},1);
+   return $self->{state};
 }
 
 sub stat {
@@ -253,7 +254,8 @@ supports the following parameters:
 Immediately loads the specified file (or url, http:// and file:/// forms
 supported) and starts playing it. If you really want to play a file with
 a name starting with C<file://> or C<http://> then consider prefixing all
-your paths with C<file:///>.
+your paths with C<file:///>. Returns a true status when the song could be
+started, false otherwise.
 
 =item stat [BLOCKING]
 
