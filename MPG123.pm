@@ -20,7 +20,7 @@ BEGIN { $^W=0 } # I'm fed up with bogus and unnecessary warnings nobody can turn
 @EXPORT = @_consts;
 @EXPORT_OK = @_funcs;
 %EXPORT_TAGS = (all => [@_consts,@_funcs], constants => \@_consts);
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 $MPG123 = "mpg123";
 
@@ -36,7 +36,7 @@ sub start_mpg123 {
    my $self=shift;
    $self->{r}=local *MPG123_READER;
    $self->{w}=local *MPG123_WRITER;
-   $self->{pid}=open2($self->{r},$self->{w},$MPG123,'-R','-y','');
+   $self->{pid}=open2($self->{r},$self->{w},$MPG123,'-R','--aggressive','-y','');
    die "Unable to start $MPG123" unless $self->{pid};
    fcntl $self->{r},F_SETFL,O_NONBLOCK;
    $self->parse(qr/^\@R (\S+)/,1) or die "Error during player startup: $self->{err}\n";
@@ -87,11 +87,11 @@ sub parse {
          $self->{frame}=[split /\s+/,$1];
          # sno rno tim1 tim2
       } elsif ($line =~ /^\@S (.*)$/) {
-         @{$self}{qw(type layer samplerate
-                     mode mode_extension
-                     bpf channels
-                     copyrighted error_protected
-                     emphasis bitrate extension)}=split /\s+/,$1;
+         @{$self}{qw(type layer samplerate mode mode_extension
+                     bpf channels copyrighted error_protected
+                     emphasis bitrate extension lsf)}=split /\s+/,$1;
+         $self->{tpf} = ($self->{layer}>1 ? 1152 : 384) / $self->{samplerate};
+         $self->{tpf} *= 0.5 if $self->{lsf};
          $self->{state}=2;
       } elsif ($line =~ /^\@I ID3:(.{30})(.{30})(.{30})(....)(.{30})(.*)$/) {
          $self->{title}=$1;   $self->{artist}=$2;
@@ -143,7 +143,7 @@ sub load {
       return ();
    }
    print {$self->{w}} "LOAD $url\n";
-   delete @{$self}{qw(frame type layer samplerate mode mode_extension bpf
+   delete @{$self}{qw(frame type layer samplerate mode mode_extension bpf lsf
                       channels copyrighted error_protected title artist album
                       year comment genre emphasis bitrate extension)};
    return $self->parse(qr{^\@S\s},1);
@@ -184,7 +184,7 @@ sub IN {
 
 sub tpf {
    my $self=shift;
-   ($self->{layer}>1 ? 1152 : 384) / $self->{samplerate};
+   $self->{tpf};
 }
 
 for my $field (qw(title artist album year comment genre state url
@@ -248,13 +248,13 @@ Jumps to the specified frame of the song. If the number is prefixed with
 
 Stops the currently playing song and unloads it.
 
-=item framerate(rate)
+=item statfreq(rate)
 
 Sets the rate at which automatic frame updates are sent by mpg123. C<0>
 turns it off, everything else is the average number of frames between
 updates.  This can be a floating pount value, i.e.
 
- $player->framerate (0.5/$player->tpf);
+ $player->statfreq(0.5/$player->tpf);
 
 will set two updates per sond (one every half a second).
 

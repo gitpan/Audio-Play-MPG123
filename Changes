@@ -1,6 +1,11 @@
 Revision history for Perl extension Audio::Play::MPG123
 
-0.03
+0.04  Fri Jun 23 08:03:01 CEST 2000
+	- fixed tpf, required a change in mpg123.
+        - small improvements to mpg123sh, fixing the completion problem
+          with perl's readlines in a very ugly way.
+
+0.03  Fri Jun 25 01:20:42 CEST 1999
 	- bug fixes, many of them to mpg123.
         - removed opts method, implemented statfreq method instead.
         - added tpf method.

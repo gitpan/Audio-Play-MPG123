@@ -23,16 +23,16 @@ DESCRIPTION
 
   I wrote it because I really hate all these nifty frontend that take
   sparse desktop space. Xmms came close, but I couldn't get it to work
-  (xmms, not the pelr interface module), so I wrote my own wrapper around
+  (xmms, not the perl interface module), so I wrote my own wrapper around
   mpg123.
 
 INSTALLATION
 
-  Get your hands on a suitable mpg123 player. While version 0.59r or
-  above should work, it uses more resources and contains many bugs
+  Get your hands on a suitable mpg123 player binary. While version 0.59r
+  or above should work, it uses more resources and contains many bugs
   (frequent deadlocks or worse), so I recommend to use the included
   version instead, which has many bugfixes and some enhancements (notably
-  irix 6.2 support).
+  irix 6 support).
 
   In short: look in the subdirectory mpg123/, compile the mpg123 binary
   and put it somewhere in your path or edit the variable $MPG123 in the

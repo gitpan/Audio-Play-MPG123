@@ -5,7 +5,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     'dist'	=> {
 	            PREOP	=> 'chmod -R u=rwX,go=rX . ;',
-	            COMPRESS	=> 'gzip -9v',
+	            COMPRESS	=> 'gzip -9vf',
 	            SUFFIX	=> '.gz',
 	           },
     'NAME'	=> 'Audio::Play::MPG123',

@@ -3,12 +3,98 @@
 # most of this file is dedicated to work around the braindead ReadLine
 # implementation.
 
-BEGIN { $ENV{PERL_RL} |= "Perl o=0" };
+BEGIN { $ENV{PERL_RL} |= "Perl o=0" }
+BEGIN { eval "use Time::HiRes 'time'" }
+
+$RC = "$ENV{HOME}/.mpg123shrc";
 
 use Audio::Play::MPG123;
 use Term::ReadLine;
 use Fcntl; # required by MPG123 anyway
 use Cwd;
+use File::Glob;
+
+$|=1;
+
+do $RC;
+
+sub write_rc {
+   require Data::Dumper;
+   print "writing $RC... ";
+   open RC, ">$RC" or die "$RC: $!";
+   print RC Data::Dumper->Dump([\%conf], ['*conf']);
+   close RC;
+   print "ok\n";
+}
+
+sub oconf {
+   my ($cmd, $value) = @_;
+   if ($cmd eq "log") {
+      if ($value =~ /^\s*$/) {
+         delete $conf{log};
+      } else {
+         $conf{log} = $value;
+      }
+      write_rc;
+   } elsif ($cmd eq "conf") {
+      while (my ($k, $v) = each %conf) {
+         printf "%-10s => %s\n", $k, $v;
+      }
+   } else {
+      print "unknown o command, use <log> or <conf>.\n";
+   }
+}
+
+# do uri-style escaping PLUS escape space to · and back (sorry for that :()
+sub uri_esc($) {
+   local $_ = shift;
+   s/([^\x21-\x24\x26-\x7e\xa0-\xb6\xb8-\xff])/sprintf "%c%02x", 0x25, ord($1)/ge;
+   s/%20/·/g;
+   $_;
+}
+
+sub uri_unesc($) {
+   local $_ = shift;
+   s/·/%20/g;
+   s/%([0-9a-f][0-9a-f])/chr(hex($1))/gei;
+   $_;
+}
+
+sub mp3log {
+   my ($cmd, @args) = @_;
+   if (defined $conf{log}) {
+      if (open LOG, ">>$conf{log}") {
+         print LOG "$cmd @args\n";
+         close LOG;
+      } else {
+         warn "$conf{log}: $!\n";
+      }
+   }
+}
+
+my $current_url;
+my $current_time;
+
+sub load_url {
+   my $url = shift;
+   if (defined $current_url) {
+      mp3log "T", $current_url, sprintf ("%0.2f", time - $current_time);
+   }
+   $current_url = $url;
+   if (defined $url) {
+      $current_time = time;
+      $player->load(uri_unesc($url));
+   }
+}
+
+END {
+   load_url();
+}
+
+$SIG{INT} =
+$SIG{HUP} =
+$SIG{PIPE} =
+$SIG{TERM} = sub { exit };
 
 # terribly fool the Term::ReadLine packages..
 sub Tk::DoOneEvent { }
@@ -18,8 +104,6 @@ sub Term::ReadLine::Tk::register_Tk { }
 $rl = new Term::ReadLine "mpg123sh";
 $rl->tkRunning(1);
 
-$|=1;
-
 # contains tuples of the form [url, repeat]
 @playlist=();
 $p_url;
@@ -28,7 +112,7 @@ $p_repeat;
 $player = new Audio::Play::MPG123;
 
 sub file_completion {
-   glob "$_[0]*";
+   File::Glob::glob "$_[0]*", GLOB_MARK|GLOB_TILDE;
 }
 
 sub next_song {
@@ -40,7 +124,8 @@ sub next_song {
    }
    if ($p_url) {
       $p_repeat--;
-      $player->load($p_url);
+      load_url($p_url);
+      mp3log("-", $p_url);
       $player->stat;
    }
 }
@@ -57,7 +142,7 @@ $rl->Attribs->{completion_function} = sub {
          $c = $2;
       }
    }
-   @r = file_completion $c;
+   @r = file_completion uri_unesc($c);
    if (@r == 1) {
       if (-f $r[0]) {
          $rl->Attribs->{completer_terminator_character}=" ";
@@ -65,9 +150,8 @@ $rl->Attribs->{completion_function} = sub {
          $rl->Attribs->{completer_terminator_character}="/";
       }
    }
-   @r=map "$p$_",@r;
    #print "\n<$word|$line|$pos> = ",join(":",@r)," #",scalar@r,"\n";
-   @r;
+   map $p.uri_esc($_),@r;
 };
 
 sub event_loop {
@@ -107,32 +191,42 @@ for(;;) {
    }
    $_=$rl->readline("$prompt> ");
    if (/^l(?:oad)?\s*(.*?)\s*$/i) {
-      $player->load($1) or print "ERROR: ",$player->error,"\n";
+      my $url = $player->canonicalize_url($1);
+      load_url($url) or print "ERROR: ",$player->error,"\n";
+      mp3log("l", $url);
       $player->stat;
    } elsif (/^a(?:dd)?\s*(.*?)\s*$/i) {
       push(@playlist,[$player->canonicalize_url($1),1]);
       next_song if $player->state == 0;
+      mp3log("a", $playlist[-1][0]);
    } elsif (/^r(?:epeat)?\s*(\d+)\s*$/) {
       $playlist[-1][1] = $1;
    } elsif (/^p/i) {
       $player->pause;
    } elsif (/^d(?:el)?\s*(\d*)\s*$/i) {
-      if ($1) {
-         splice @playlist,$1-1,1;
-      } else {
-         $p_repeat=0;
-         $player->stop;
-         next_song;
-         pop @playlist;
+      for (do {
+         if ($1) {
+            splice @playlist,$1-1,1;
+         } else {
+            $p_repeat=0;
+            $player->stop;
+            next_song;
+            pop @playlist;
+         }
+      }) {
+         mp3log("d", $_->[0]);
       }
    } elsif (/^s/i) {
       $p_repeat=0;
       $player->stop;
+      mp3log("s", $playlist[0][0]);
       next_song;
    } elsif (/^c(?:d)?\s*(.*?)\s*$/i) {
       chdir $1 or print "Unable to change to '$1': $!\n";
    } elsif (/^j(?:ump)?\s*([0-9.]+)\s*$/i) {
       eval { $player->jump(int($1/$player->tpf)) };
+   } elsif (/^o\s*(\w+)\s*(.*)/i) {
+      oconf($1,$2);
    } elsif (/^q/i) {
       last;
    } elsif (/^i(nfo)?/i) {
@@ -170,9 +264,12 @@ del                    remove the currently playing song
 jump <second>          seek to the specified position
 repeat <count>         repeat the last recently added song <count times>
 help                   this listing
+o                      manipulate configuration
+o conf                 show current configuration
+o log <path>           log all playing actions into file <path>
 
 - most commands can be shortened to a one-letter form
-- any whitespace between command and arguments is optional
+- most whitespace between command and arguments is optional
 
 EOF
    } elsif (/\S/) {

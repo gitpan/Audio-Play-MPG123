@@ -165,7 +165,7 @@ void control_generic (struct frame *fr)
 				play_frame(init,fr);
 				if (init) {
 					static char *modes[4] = {"Stereo", "Joint-Stereo", "Dual-Channel", "Single-Channel"};
-					generic_sendmsg("S %s %d %ld %s %d %d %d %d %d %d %d %d",
+					generic_sendmsg("S %s %d %ld %s %d %d %d %d %d %d %d %d %d",
 						fr->mpeg25 ? "2.5" : (fr->lsf ? "2.0" : "1.0"),
 						fr->lay,
 						freqs[fr->sampling_frequency],
@@ -177,7 +177,8 @@ void control_generic (struct frame *fr)
 						fr->error_protection ? 1 : 0,
 						fr->emphasis,
 						tabsel_123[fr->lsf][fr->lay-1][fr->bitrate_index],
-						fr->extension);
+						fr->extension,
+                                                fr->lsf);
 					init = 0;
 				        generic_sendstat(fr, framecnt);
                                         statcnt = 0;

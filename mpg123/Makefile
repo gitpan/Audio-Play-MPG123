@@ -157,8 +157,8 @@ linux-alsa:
 		OBJECTS='decode_i386.o dct64_i386.o decode_i586.o \
 			audio_alsa.o term.o' \
 		CFLAGS='-DI386_ASSEM -DREAL_IS_FLOAT -DPENTIUM_OPT -DLINUX \
-			-DREAD_MMAP -DALSA -DTERM_CONTROL\
-			-Wall  -O2 -m486 \
+			-DREAD_MMAP -DALSA -DTERM_CONTROL \
+			-Wall  -O6 \
 			-fomit-frame-pointer -funroll-all-loops \
 			-finline-functions -ffast-math \
 			$(RPM_OPT_FLAGS)' \
