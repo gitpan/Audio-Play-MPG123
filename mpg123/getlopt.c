@@ -6,6 +6,7 @@
  */
 
 #include "getlopt.h"
+#include <stdio.h>
 
 int loptind = 1;	/* index in argv[] */
 int loptchr = 0;	/* index in argv[loptind] */
@@ -43,15 +44,19 @@ int performoption (int argc, char *argv[], topt *opt)
 {
 	int result = GLO_CONTINUE;
 
-	if (!(opt->flags & 1)) { /* doesn't take argument */
+	if (!(opt->flags & GLO_ARG)) { /* doesn't take argument */
 		if (opt->var) {
-			if (opt->flags & 2) /* var is *char */
+			if (opt->flags & GLO_CHAR) /* var is *char */
 				*((char *) opt->var) = (char) opt->value;
-			else
+			else if (opt->flags & GLO_LONG)
 				*((long *) opt->var) = opt->value;
+			else if (opt->flags & GLO_FLOAT)
+				*((double *) opt->var) = (double) atof(loptarg);
+			else
+			        *((int *) opt->var) = opt->value;
 		}
-		else
-			result = opt->value ? opt->value : opt->sname;
+		/* else
+			result = opt->value ? opt->value : opt->sname; */
 	}
 	else { /* requires argument */
 		if (loptind >= argc)
@@ -59,13 +64,23 @@ int performoption (int argc, char *argv[], topt *opt)
 		loptarg = argv[loptind++]+loptchr;
 		loptchr = 0;
 		if (opt->var) {
-			if (opt->flags & 2) /* var is *char */
+			if (opt->flags & GLO_CHAR) /* var is *char */
 				*((char **) opt->var) = strdup(loptarg);
-			else
+			else if (opt->flags & GLO_LONG)
 				*((long *) opt->var) = atoi(loptarg);
+			else if (opt->flags & GLO_FLOAT)
+				*((double *) opt->var) = (double) atof(loptarg);
+			else {
+                           fprintf(stderr,"Error in param cfg.\n");
+                           exit(1);
+                        }
 		}
-		else
+/*
+		else {
+fprintf(stderr,"%d %d",opt->value , opt->sname);
 			result = opt->value ? opt->value : opt->sname;
+                }
+*/
 	}
 	if (opt->func)
 		opt->func(loptarg);

@@ -14,10 +14,10 @@ Have fun!
 
 Some additional remarks:
 
- - There is currently no direct audio hardware support for the
-   "dec" and "generic" targets.  That means that you have to use
-   the "-s" commandline option to write the decoded audio data
-   to stdout.
+ - There is currently no direct audio hardware support for some
+   hardware and (of course) "generic" targets.  That means that you 
+   have to use the "-s" commandline option to write the decoded audio 
+   data to stdout.
 
  - On Solaris, use Sun's SparcWorks compiler ("make solaris")
    if at all possible.  It generates faster code than gcc, so
@@ -34,7 +34,7 @@ Some additional remarks:
    on an HP-UX 9 account, but there were some problems with
    libraries on HP-UX 10.  I'm not an HP expert, but perhaps
    someone else can fix it.
-   [note: some people report NO problems also with HP-UX 10]
+   [note: quite a few people report NO problems also with HP-UX 10]
 
  - IRIX: some people reported compile problems on IRIX 5.x (5.3)
          but 6.x seems to compile without problems

@@ -142,7 +142,7 @@ int synth_1to1(real *bandPtr,int channel,unsigned char *out,int *pnt)
   int bo1;
 #endif
 
-  if(equalfile)
+  if(param.enable_equalizer)
 	do_equalizer(bandPtr,channel);
 
 #ifndef PENTIUM_OPT
@@ -235,14 +235,15 @@ int synth_1to1(real *bandPtr,int channel,unsigned char *out,int *pnt)
   *pnt += 128;
 
   return clip;
-#else
-#ifdef USE_3DNOW
+#elif defined(USE_MMX)
   {
-    int ret;
-    ret = synth_1to1_3dnow(bandPtr,channel,out+*pnt);
+    static short buffs[2][2][0x110];
+    static int bo = 1;
+    short *samples = (short *) (out + *pnt);
+    synth_1to1_MMX(bandPtr, channel, samples, (short *) buffs, &bo); 
     *pnt += 128;
-    return ret;
-  }
+    return 0;
+  } 
 #else
   {
     int ret;
@@ -251,6 +252,4 @@ int synth_1to1(real *bandPtr,int channel,unsigned char *out,int *pnt)
     return ret;
   }
 #endif
-#endif
 }
-

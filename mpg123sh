@@ -3,7 +3,8 @@
 # most of this file is dedicated to work around the braindead ReadLine
 # implementation.
 
-BEGIN { $ENV{PERL_RL} |= "Perl o=0" }
+#BEGIN { $ENV{PERL_RL} |= "Perl o=0" }
+BEGIN { $ENV{PERL_RL} |= " o=0" }
 BEGIN { eval "use Time::HiRes 'time'" }
 
 $RC = "$ENV{HOME}/.mpg123shrc";
@@ -216,6 +217,14 @@ $rl->Attribs->{completion_function} = sub {
    map $p.uri_esc($_),@r;
 };
 
+my $pwr_state = 1;
+sub pwr_change {
+   $SIG{PWR} = \&pwr_change;
+   $pwr_state = !$pwr_state;
+
+};
+$SIG{PWR} = \&pwr_change;
+
 sub event_loop {
    my $r;
    my $rlin = $rl->IN;
@@ -229,11 +238,14 @@ sub event_loop {
       return unless $eof;
    }
    do {
-      next_song if $player->state == 0;
+      next_song if $player->state == 0 && $pwr_state;
+      $player->stop if $player->state && !$pwr_state;
       vec($r, fileno($rlin), 1)       = 1;
       vec($r, fileno($player->IN), 1) = 1;
-      select $r, undef, undef, undef;
-      $player->poll(0) if vec($r,fileno($player->IN),1);
+      (select $r, undef, undef, undef) < 0 and $r = "";
+      if (vec($r,fileno($player->IN),1)) {
+         $player->poll(0);
+      }
    } until vec($r, fileno($rlin), 1);
 }
 

@@ -10,6 +10,7 @@
 #endif
 
 #include <stdlib.h>
+#include <sys/ioctl.h>
 
 #ifdef NETBSD
 #include <sys/ioctl.h>
@@ -18,14 +19,23 @@
 #include "mpg123.h"
 
 #ifndef SPARCLINUX
-#include <sys/filio.h>
-#ifdef SUNOS
-#include <sun/audioio.h>
+# include <sys/filio.h>
+# ifdef SUNOS
+#  include <sun/audioio.h>
+# else
+#  include <sys/audioio.h>
+# endif
 #else
-#include <sys/audioio.h>
-#endif
-#else
-#include <asm/audioio.h>
+# include <sys/ioctl.h>
+# include <linux/ioctl.h>
+# include <asm/audioio.h>
+
+/* for Ultrapenguin... */
+# if 0
+#  include <audiofile.h>
+#  include <linux/soundcard.h>
+# endif
+
 #endif
 
 static void audio_set_format_helper(struct audio_info_struct *ai,audio_info_t *ainfo);
@@ -67,7 +77,10 @@ int audio_open(struct audio_info_struct *ai)
       return -1;
     if(param.verbose > 1)
       fprintf(stderr,"Audio device type: %s\n",ad.name);
-    if(!strstr(ad.name,"dbri") && !strstr(ad.name,"CS4231") && param.verbose)
+    if(!strcmp(ad.name,"am79c30")) {
+	fprintf(stderr,"Found ugly 8Khz only am79c390 device");
+    }
+    else if(!strstr(ad.name,"dbri") && !strstr(ad.name,"CS4231") && param.verbose)
       fprintf(stderr,"Warning: Unknown sound system %s. But we try it.\n",ad.name);
   }
 #endif
@@ -262,3 +275,17 @@ void audio_queueflush (struct audio_info_struct *ai)
 	ioctl (ai->fn, AUDIO_FLUSH, 0);
 }
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -163,7 +163,8 @@ int xfermem_getcmd (int fd, int block)
 
 		FD_ZERO (&selfds);
 		FD_SET (fd, &selfds);
-#ifdef HPUX
+		/* #ifdef HPUX */ /* seems to trigger performance problems? strange */
+#if 0
 		switch (select(FD_SETSIZE, (int *) &selfds, NULL, NULL, block ? NULL : &selto)) {
 #else
 		switch (select(FD_SETSIZE, &selfds, NULL, NULL, block ? NULL : &selto)) {
@@ -232,25 +233,21 @@ int xfermem_block (int readwrite, txfermem *xf)
 #include <sys/types.h>
 #include <fcntl.h>
 
-#include "xfermem.h"
+#include "mpg123.h"
 
 extern int errno;
 
 void xfermem_init (txfermem **xf, int bufsize, int msize, int skipbuf)
 {
-  return 0;
 }
 void xfermem_done (txfermem *xf)
 {
-  return 0;
 }
 void xfermem_init_writer (txfermem *xf)
 {
-  return 0;
 }
 void xfermem_init_reader (txfermem *xf)
 {
-  return 0;
 }
 int xfermem_get_freespace (txfermem *xf)
 {

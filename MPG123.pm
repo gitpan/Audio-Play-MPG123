@@ -20,15 +20,16 @@ BEGIN { $^W=0 } # I'm fed up with bogus and unnecessary warnings nobody can turn
 @EXPORT = @_consts;
 @EXPORT_OK = @_funcs;
 %EXPORT_TAGS = (all => [@_consts,@_funcs], constants => \@_consts);
-$VERSION = '0.051';
+$VERSION = '0.052';
 
 $MPG123 = "mpg123";
 
 $OPT_AUTOSTAT = 1;
 
 sub new {
-   my $self = bless {@_},shift;
-   $self->start_mpg123;
+   my $class = shift;
+   my $self = bless { @_ }, $class;
+   $self->start_mpg123(@{$self->{mpg123args} || []});
    $self;
 }
 
@@ -36,11 +37,11 @@ sub start_mpg123 {
    my $self = shift;
    $self->{r} = local *MPG123_READER;
    $self->{w} = local *MPG123_WRITER;
-   $self->{pid} = open2($self->{r},$self->{w},$MPG123,'-R','--aggressive','-y','');
+   $self->{pid} = open2($self->{r},$self->{w},$MPG123,'-R','--aggressive','-y',@_,'');
    die "Unable to start $MPG123" unless $self->{pid};
    fcntl $self->{r}, F_SETFL, O_NONBLOCK;
    fcntl $self->{r}, F_SETFD, FD_CLOEXEC;
-   $self->parse(qr/^\@R (\S+)/,1) or die "Error during player startup: $self->{err}\n";
+   $self->parse(qr/^\@?R (\S+)/,1) or die "Error during player startup: $self->{err}\n";
    $self->{version}=$1;
 }
 
@@ -56,7 +57,7 @@ sub stop_mpg123 {
 sub line {
    my $self = shift;
    my $wait = shift;
-   for(;;) {
+   while() {
       return $1 if $self->{buf} =~ s/^([^\n]*)\n+//;
       my $len = sysread $self->{r},$self->{buf},4096,length($self->{buf});
       # collapse out the most frequent event, very useful for slow machines
@@ -97,7 +98,7 @@ sub parse {
       } elsif ($line =~ /^\@I (.*)$/) {
          $self->{title}=$1;
          delete @{$self}{qw(artist album year comment genre)}
-      } elsif ($line =~ /^\@P (\d+)$/) {
+      } elsif ($line =~ /^\@P (\d+)(?: (\S+))?$/) {
          $self->{state} = $1;
          # 0 = stopped, 1 = paused, 2 = continued
       } elsif ($line =~ /^\@E (.*)$/) {
@@ -240,9 +241,12 @@ refreshed by an asynchronous STAT event or an explicit call to C<state>).
 
 =over 4
 
-=item new
+=item new [parameter => value, ...]
 
-This creates a new player object and also starts the mpg123 process.
+This creates a new player object and also starts the mpg123 process. New
+supports the following parameters:
+
+   mpg123args      an arrayreg with additional arguments for the mpg123 process
 
 =item load(<path or url>) [BLOCKING]
 

@@ -43,8 +43,9 @@ RESPONSE CODES
 Note: mpg123 returns errors on stderr, so your frontend should
       look not only at stdout but also at stderr for responses.
 
-@R MPG123
+@R MPG123 <a>
 			Startup version message
+			a = version string
 
 @I ID3:<a><b><c>
 			Status message after loading a song (ID3 song info)
@@ -81,16 +82,38 @@ Note: mpg123 returns errors on stderr, so your frontend should
 			c = seconds (float)
 			d = seconds left (float)
 
-@P <a>
+@P <a> <b>
 			Playing status
 			a = 0: playing stopped
+				b = EOF: stopped, because end of song reached
 			a = 1: playing paused
 			a = 2: playing unpaused
-
 @E <a>
 			An error occured
 			Errors may be also reported by mpg123 through
 			stderr (without @E)
 			a = error message (string)
+
+
+REMOTE CONTROL VIA NETWORK (1)
+------------------------------
+You can call mpg123 via the inetd and then do the control via telnet.
+
+In /etc/services you must add something like
+  mpg123      22123/tcp
+
+In /etc/inetd.conf you add something like
+  mpg123  stream  tcp     nowait  root    /usr/bin/mpg123        mpg123 -R
+
+This may be ABSOLUTELY UNSECURE!! A little better security is to change the 
+user id from 'root' to 'nobody'. Don't forget to copy the mpg123 binary to
+/usr/bin/ or change the path in the above inetd.conf configuration.
+Don't forget to restart the 'inetd' program so it rereads its configuration file.
+
+REMOTE CONTROL VIA NETWORK (2)
+------------------------------
+Last way to control mpg123 via network is a simple interface called 'udpif' in the
+tools/ directory. Read the header of the udpif.c file to get more information.
+(may also be ABSOLUTELY UNSECURE!! Use with care!)
 
 

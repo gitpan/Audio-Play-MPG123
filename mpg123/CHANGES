@@ -1,3 +1,47 @@
+0.59s: (MH)
+-----
+- Added 'esdserver' symbol in mpg123.c
+- fixed bug in layer3 intensiv-stereo 
+- minor bugfix in audio.h for ALSA driver
+- changed default for xterm-title (--title option to switch on)
+- minor cleanup in Makefile for the initial help information
+- Added -u option to manual pages list of option (PR)
+- Change setlinebuf() to equivalent call to setvbuf() to get it to
+  compile on HP/UX. (PR)
+- minor bug in xterm-title-part
+- added dk1 patches (CDR/WAV/AU error handling)
+- patches from Andre Doherty <adoherty@hotmail.com>: open_stream with 
+  errorcode, space-patch
+- fixed genre check
+- fixed/changes in control_generic
+- applied faster/newer/netter 3Dnow from KIMURA (see README.3DNOW for more)
+- fixed decoding bug for linux-alpha
+- fixed minor compile problem for linux-sparc
+- added Hans Schwengeler's (schweng@astro.unibas.ch) audio_dec additions
+- more changes for reentrant versions
+- added VBR,Layer1,Layer2 in mpglib
+- SGI/audio fix for mono streams
+- option -a now works for HPUX audio
+- r0c/r1c > 22 fix
+- added Wojciech Barañski's Mp3Play (check the tools folder)
+- added Tim Ruddick playlist/http bugfix
+- added Daniel Koukola's patch for audio_oss.c (SNDCTL_DSP_GETBLKSIZE ioctl)
+- added higway's <higway@mednet.md> MMX Patch
+- moved the playlist/shuffle stuff in a seperate file
+- added some MMX patches from higway
+- added IPv6 patch from sumikawa@ebina.hitachi.co.jp
+- major change in the stream reader: support for free format
+  streams and better 'resync-on-error'. May still contain some bugs, so
+  please TEST and TEST and TEST ;)
+- applied Martin Sjögren"S <md9ms@mdstud.chalmers.se> %20 patch
+- applied TEMHOTA'S <temnota@kmv.ru> HTTP,FTP patch/playlist fix
+- added experimental --pitch option
+- minor fix in dct64_MMX.s
+- added TERM_CONTROL 'DK-Paetsches'
+- applied Erik Andersen <andersen@codepoet.org> NetWinder patches
+  (derived from: ftp://ftp.netwinder.org/users/c/craign/mp3/)
+
+
 0.59r: (MH)
 -----
 - applied audio_alib changes from Ralf Hildebrandt <R.Hildebrandt@TU-BS.DE>
@@ -23,6 +67,7 @@
 - more SGI audio patches from Gilles Zunino <Gilles.Zunino@hei.fupl.asso.fr>
 - applied esdserver patch from Matthew Parslow <roy@alpha.alphalink.com.au>
 - added some fixes for control_generic
+- changed '//' comments in control_generic.c to /*
 
 0.59q: (MH)
 ------

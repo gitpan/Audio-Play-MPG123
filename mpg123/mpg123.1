@@ -5,7 +5,7 @@ mpg123 \- play audio MPEG 1.0/2.0 file (layers 1, 2 and 3)
 .SH SYNOPSIS
 .B mpg123
 [
-.B \-tscvqy01m24
+.B \-tscCvqy01m24
 ]
 [
 .BI \-b " size"
@@ -39,6 +39,9 @@ mpg123 \- play audio MPEG 1.0/2.0 file (layers 1, 2 and 3)
 ]
 [
 .BI \-p " proxy"
+]
+[
+.BI \-u " u"
 ]
 [
 .BI \-@ " file"
@@ -77,6 +80,11 @@ The output format is raw (headerless) linear PCM audio data,
 Check for filter range violations, and report them for each frame
 if any occur.
 .TP
+.BR \-C ", " \-\^\-control
+Enable control keys. By default use 's' to stop, 'p' to 
+pause, 'f' to jump forward to the next song, 'b' to jump back to the 
+beginning of the song, ',' to rewind, '.' to fast forward, and 'q' to quit. 
+.TP
 .BR \-v ", " \-\^\-verbose
 Increase the verbosity level.  For example, displays the frame
 numbers during decoding.
@@ -106,7 +114,9 @@ CPU time than full stereo decoding.
 .BR \-2 ", " \-\^\-2to1 "; " \-4 ", " \-\^\-4to1
 Performs a downsampling of ratio 2:1 (22 kHz) or 4:1 (11 kHz) 
 on the output stream, respectively. Saves some CPU cycles, but 
-at least the 4:1 ratio sounds ugly.
+at least the 4:1 ratio sounds ugly. Please note, that does not
+change speed of the song. Ie the \-\-2to1 option is the same like
+forcing the sampling output rate to \-r 22050 on a 44.1 kHz song.
 .TP
 \fB\-b \fIsize\fR, \fB\-\^\-buffer \fIsize
 Use an audio output buffer of
@@ -134,9 +144,10 @@ Change scale factor (default: 32768).
 .TP
 \fB\-r \fIrate\fR, \fB\-\^\-rate \fIrate
 Set sample rate (default: automatic).  You may want to
-change this if you need a constant bitrate independed of
+change this if you need a constant output rate independed of
 the mpeg stream rate. mpg123 automagically converts the
-rate. You should then combine this with \-\-stereo or \-\-mono.
+rate (down/up sampling) . You should then combine 
+this with \-\-stereo or \-\-mono.
 
 .TP
 \fB\-g \fIgain\fR, \fB\-\^\-gain \fIgain
@@ -223,6 +234,12 @@ Forces reopen of the audiodevice after ever song
 .TP
 .BR \-\-8bit
 Forces 8bit output
+.TP
+.BR \-w ", " \-\-wav " " \fIfile
+Write the song using the WAV format to the specified
+.I file 
+Instead of a real filename you can use a dash ``\-'' to indicate that
+the data is to be written to standard out.
 .TP
 .BR \-Z ", " \-\-random
 Full random play
@@ -377,7 +394,7 @@ Oliver Fromme <oliver.fromme@heim3.tu-clausthal.de>
 .P
 Internet references:
 .br
-http://www.sfs.nphil.uni-tuebingen.de/~hipp/mpg123.html
+http://www.mpg123.de/
 .br
 http://www.heim3.tu-clausthal.de/~olli/mpg123/
 .br

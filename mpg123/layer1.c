@@ -10,6 +10,8 @@
 
 #include "mpg123.h"
 
+#include "getbits.h"
+
 void I_step_one(unsigned int balloc[], unsigned int scale_index[2][SBLIMIT],struct frame *fr)
 {
   unsigned int *ba=balloc;
@@ -19,34 +21,34 @@ void I_step_one(unsigned int balloc[], unsigned int scale_index[2][SBLIMIT],stru
     int i;
     int jsbound = fr->jsbound;
     for (i=0;i<jsbound;i++) { 
-      *ba++ = getbits(4);
-      *ba++ = getbits(4);
+      *ba++ = getbits(&bsi,4);
+      *ba++ = getbits(&bsi,4);
     }
     for (i=jsbound;i<SBLIMIT;i++)
-      *ba++ = getbits(4);
+      *ba++ = getbits(&bsi,4);
 
     ba = balloc;
 
     for (i=0;i<jsbound;i++) {
       if ((*ba++))
-        *sca++ = getbits(6);
+        *sca++ = getbits(&bsi,6);
       if ((*ba++))
-        *sca++ = getbits(6);
+        *sca++ = getbits(&bsi,6);
     }
     for (i=jsbound;i<SBLIMIT;i++)
       if ((*ba++)) {
-        *sca++ =  getbits(6);
-        *sca++ =  getbits(6);
+        *sca++ =  getbits(&bsi,6);
+        *sca++ =  getbits(&bsi,6);
       }
   }
   else {
     int i;
     for (i=0;i<SBLIMIT;i++)
-      *ba++ = getbits(4);
+      *ba++ = getbits(&bsi,4);
     ba = balloc;
     for (i=0;i<SBLIMIT;i++)
       if ((*ba++))
-        *sca++ = getbits(6);
+        *sca++ = getbits(&bsi,6);
   }
 }
 
@@ -66,13 +68,13 @@ void I_step_two(real fraction[2][SBLIMIT],unsigned int balloc[2*SBLIMIT],
     ba = balloc;
     for (sample=smpb,i=0;i<jsbound;i++)  {
       if ((n = *ba++))
-        *sample++ = getbits(n+1);
+        *sample++ = getbits(&bsi,n+1);
       if ((n = *ba++))
-        *sample++ = getbits(n+1);
+        *sample++ = getbits(&bsi,n+1);
     }
     for (i=jsbound;i<SBLIMIT;i++) 
       if ((n = *ba++))
-        *sample++ = getbits(n+1);
+        *sample++ = getbits(&bsi,n+1);
 
     ba = balloc;
     for (sample=smpb,i=0;i<jsbound;i++) {
@@ -102,7 +104,7 @@ void I_step_two(real fraction[2][SBLIMIT],unsigned int balloc[2*SBLIMIT],
     ba = balloc;
     for (sample=smpb,i=0;i<SBLIMIT;i++)
       if ((n = *ba++))
-        *sample++ = getbits(n+1);
+        *sample++ = getbits(&bsi,n+1);
     ba = balloc;
     for (sample=smpb,i=0;i<SBLIMIT;i++) {
       if((n=*ba++))
@@ -115,7 +117,7 @@ void I_step_two(real fraction[2][SBLIMIT],unsigned int balloc[2*SBLIMIT],
   }
 }
 
-int do_layer1(struct frame *fr,int outmode,struct audio_info_struct *ai)
+int do_layer1(struct mpstr *mp,struct frame *fr,int outmode,struct audio_info_struct *ai)
 {
   int clip=0;
   int i,stereo = fr->stereo;

@@ -29,8 +29,6 @@ extern struct audio_info_struct ai;
 extern FILE *filept;
 extern int tabsel_123[2][3][16];
 extern int buffer_pid;
-extern long startFrame;
-extern long outscale;
 int rewindspeed;
 
 #ifndef PATH_MAX
@@ -223,13 +221,13 @@ int tk3play_handlemsg(struct frame *fr,struct timeval *timeout)
       for (framecnt = 0; ok && framecnt < rdata; framecnt++) {
         ok = read_frame(fr);
 	if (fr->lay == 3)
-	  set_pointer(512);
+	  set_pointer(fr->sideInfoSize,512);
       }
     } else {
       for (;ok && framecnt < rdata; framecnt++) {
         ok = read_frame(fr);
 	if (fr->lay == 3)
-	  set_pointer(512);
+	  set_pointer(fr->sideInfoSize,512);
       }
     }
     mode = MODE_PLAYING_AND_DECODING;
@@ -250,8 +248,8 @@ int tk3play_handlemsg(struct frame *fr,struct timeval *timeout)
     break;
 
   case MSG_SCALE:
-    outscale = rdata;
-    make_decode_tables(outscale);
+    param.outscale = rdata;
+    make_decode_tables(param.outscale);
     break;
 
   case MSG_QUIT:
@@ -291,7 +289,7 @@ int tk3play_handlemsg(struct frame *fr,struct timeval *timeout)
 }
 
   
-void control_tk3play(struct frame *fr) 
+void control_tk3play(struct mpstr *mp,struct frame *fr) 
 {
   struct timeval timeout;
   static int hp = 0;
@@ -319,16 +317,16 @@ void control_tk3play(struct frame *fr)
       }
 
       framecnt++;
-      if (framecnt < startFrame) {
+      if (framecnt < param.startFrame) {
         if (fr->lay == 3)
-          set_pointer(512);
+          set_pointer(fr->sideInfoSize,512);
         continue;
       }
       if (param.doublespeed && (framecnt % param.doublespeed)) {
 	if (fr->lay == 3)
-          set_pointer(512);
+          set_pointer(fr->sideInfoSize,512);
       } else {
-        play_frame(init,fr);
+        play_frame(mp,init,fr);
         if (init) {
 	  sai.bitrate = tabsel_123[fr->lsf][fr->lay-1][fr->bitrate_index] 
                         * 1000;
@@ -342,7 +340,7 @@ void control_tk3play(struct frame *fr)
 	  tk3play_sendmsg(MSG_FRAMES,framecnt);
 	  tk3play_sendmsg(MSG_BUFFER,buffer_used());
 	  tk3play_sendmsg(MSG_TIME,calc_time());
-	  init = startFrame = 0;
+	  init = param.startFrame = 0;
         }
       }
 
@@ -379,7 +377,7 @@ void control_tk3play(struct frame *fr)
 	mode = MODE_PLAYING_OLD_FINISHED_DECODING_NEW;
 	continue;
       }
-      play_frame(init,fr);
+      play_frame(mp,init,fr);
       framecnt++;
 
       if (init) {

@@ -39,7 +39,7 @@ int sajber_sendmsg(int type,int data)
 	return write(1,&msg,sizeof(TControlMsg));
 }
 
-void control_sajber(struct frame *fr) 
+void control_sajber(struct mpstr *mp,struct frame *fr) 
 {
 	struct timeval timeout;
 	fd_set readfds;
@@ -69,7 +69,7 @@ void control_sajber(struct frame *fr)
 					sajber_sendmsg(MSG_NEXT,0);
 					continue;
 				}
-				play_frame(init,fr);
+				play_frame(mp,init,fr);
 				if(init) {
 					AudioInfo sai;
 					sai.bitrate = tabsel_123[fr->lsf][fr->lay-1][fr->bitrate_index] * 1000;
@@ -119,7 +119,7 @@ fprintf(stderr,"%d.%d\n",rmsg.type,rmsg.data);
 									read_frame(fr);
 	
 									if(framecnt && fr->lay == 3)
-										set_pointer(512);
+										set_pointer(fr->sideInfoSize,512);
 									framecnt++;
 									sajber_sendmsg(MSG_FRAMES,framecnt);
 									sajber_sendmsg(MSG_POSITION,rd->tell(rd));
@@ -246,7 +246,7 @@ fprintf(stderr,"%d.%d\n",rmsg.type,rmsg.data);
 							}
 							framecnt++;
 							if(framecnt && fr->lay == 3)
-								set_pointer(512);
+								set_pointer(fr->sideInfoSize,512);
 						/*
 							rd->back_frame(rd,fr,-16);
 							framecnt += 16;

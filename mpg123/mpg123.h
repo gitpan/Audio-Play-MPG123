@@ -26,8 +26,10 @@ typedef unsigned char byte;
 #define srandom srand
 #endif
 
-#define FRONTEND_SAJBER 1
-#define FRONTEND_TK3PLAY 2
+#define FRONTEND_NONE     0
+#define FRONTEND_SAJBER   1
+#define FRONTEND_TK3PLAY  2
+#define FRONTEND_GENERIC  3
 
 #define SKIP_JUNK 1
 
@@ -43,6 +45,10 @@ typedef unsigned char byte;
 # define random rand
 # define srandom srand
 
+# define SIGUSR1 0
+# define SIGCONT 0
+# define SIGSTOP 0
+
 # undef MPG123_REMOTE           /* Get rid of this stuff for Win32 */
 #endif
 
@@ -56,8 +62,37 @@ typedef unsigned char byte;
 #  define real float
 #elif defined(REAL_IS_LONG_DOUBLE)
 #  define real long double
+#elif defined(REAL_IS_FIXED)
+# define real long
+
+# define REAL_RADIX		15
+# define REAL_FACTOR		(32.0 * 1024.0)
+
+# define REAL_PLUS_32767	( 32767 << REAL_RADIX )
+# define REAL_MINUS_32768	( -32768 << REAL_RADIX )
+
+# define DOUBLE_TO_REAL(x)	((int)((x) * REAL_FACTOR))
+# define REAL_TO_SHORT(x)	((x) >> REAL_RADIX)
+# define REAL_MUL(x, y)		(((long long)(x) * (long long)(y)) >> REAL_RADIX)
+
 #else
 #  define real double
+#endif
+
+#ifndef DOUBLE_TO_REAL
+# define DOUBLE_TO_REAL(x)	(x)
+#endif
+#ifndef REAL_TO_SHORT
+# define REAL_TO_SHORT(x)	(x)
+#endif
+#ifndef REAL_PLUS_32767
+# define REAL_PLUS_32767	32767.0
+#endif
+#ifndef REAL_MINUS_32768
+# define REAL_MINUS_32768	-32768.0
+#endif
+#ifndef REAL_MUL
+# define REAL_MUL(x, y)		((x) * (y))
 #endif
 
 #ifdef __GNUC__
@@ -84,6 +119,9 @@ typedef unsigned char byte;
 #define         MPG_MD_DUAL_CHANNEL     2
 #define         MPG_MD_MONO             3
 
+#define MAXFRAMESIZE 1792
+#define HDRCMPMASK 0xfffffd00
+
 #define MAXOUTBURST 32768
 
 /* Pre Shift fo 16 to 8 bit converter table */
@@ -100,6 +138,9 @@ struct frame {
     struct al_table *alloc;
     int (*synth)(real *,int,unsigned char *,int *);
     int (*synth_mono)(real *,unsigned char *,int *);
+#ifdef USE_3DNOW
+    void (*dct36)(real *,real *,real *,real *,real *);
+#endif
     int stereo;
     int jsbound;
     int single;
@@ -110,7 +151,6 @@ struct frame {
     int down_sample;
     int header_change;
     int lay;
-    int (*do_layer)(struct frame *fr,int,struct audio_info_struct *);
     int error_protection;
     int bitrate_index;
     int sampling_frequency;
@@ -122,32 +162,89 @@ struct frame {
     int original;
     int emphasis;
     int framesize; /* computed framesize */
+    int padsize;   /* */
+
+    int sideInfoSize; /* Layer3 sideInfo Header size */
+
+    /* FIXME: move this to another place */
+    unsigned long firsthead;
+    unsigned long thishead;
+    int freeformatsize;
+};
+
+#define VBR_TOC_SIZE        100
+
+#define VBR_FRAMES_FLAG     0x0001
+#define VBR_BYTES_FLAG      0x0002
+#define VBR_TOC_FLAG        0x0004
+#define VBR_SCALE_FLAG      0x0008
+
+struct vbrHeader {
+	unsigned long flags;
+	unsigned long frames;
+	unsigned long bytes;
+	unsigned long scale;
+	unsigned char toc[100];
 };
 
 struct parameter {
-  int aggressive; /* renice to max. priority */
-  int shuffle;	/* shuffle/random play */
-  int remote;	/* remote operation */
-  int outmode;	/* where to out the decoded sampels */
-  int quiet;	/* shut up! */
-  long usebuffer;	/* second level buffer size */
-  int tryresync;  /* resync stream after error */
-  int verbose;    /* verbose level */
+    int aggressive; /* renice to max. priority */
+    int shuffle;	/* shuffle/random play */
+    int remote;	/* remote operation */
+    int outmode;	/* where to out the decoded sampels */
+    int quiet;	/* shut up! */
+    int xterm_title;  /* print filename in xterm title */
+    long usebuffer;	/* second level buffer size */
+    int tryresync;  /* resync stream after error */
+    int verbose;    /* verbose level */
 #ifdef TERM_CONTROL
-  int term_ctrl;
+    int term_ctrl;
 #endif
-  int force_mono;
-  int force_stereo;
-  int force_8bit;
-  long force_rate;
-  int down_sample;
-  int checkrange;
-  long doublespeed;
-  long halfspeed;
-  int force_reopen;
-  long realtime;
-  char filename[256];
+    int force_mono;
+    int force_stereo;
+    int force_8bit;
+    long force_rate;
+    double pitch;
+    int down_sample;
+    int checkrange;
+    long doublespeed;
+    long halfspeed;
+    int force_reopen;
+    int stat_3dnow; /* automatic/force/force-off 3DNow! optimized code */
+    int test_3dnow;
+    int realtime;
+    char filename[256];
+    char *esdserver;
+    char *equalfile;
+    int  enable_equalizer;
+    long outscale;
+    long startFrame;
+    int print_version;
 };
+
+struct bitstream_info {
+  int bitindex;
+  unsigned char *wordpointer;
+};
+
+struct mpstr {
+  int bsize;
+  int framesize;
+  int fsizeold;
+  struct frame fr;
+ /* int (*do_layer)(struct mpstr *,struct frame *fr,int,struct audio_info_struct *); */
+  unsigned char bsspace[2][MAXFRAMESIZE+512]; /* MAXFRAMESIZE */
+  real hybrid_block[2][2][SBLIMIT*SSLIMIT];
+  int  hybrid_blc[2];
+  unsigned long header;
+  int bsnum;
+  real synth_buffs[2][2][0x110];
+  int  synth_bo;
+
+  struct bitstream_info bsi;
+};
+
+extern struct bitstream_info bsi;
 
 struct reader {
   int  (*init)(struct reader *);
@@ -165,12 +262,16 @@ struct reader {
   int  filept;
   int  flags;
   unsigned char id3buf[128];
+  
+  unsigned char *backbuf;
+  int mark;
+  int bufpos,bufstart,bufend;
+  int bufsize;
 };
 #define READER_FD_OPENED 0x1
 #define READER_ID3TAG    0x2
 
 extern struct reader *rd,readers[];
-extern char *equalfile;
 
 extern int halfspeed;
 extern int buffer_fd[2];
@@ -181,10 +282,9 @@ extern char *prgName, *prgVersion;
 extern void buffer_loop(struct audio_info_struct *ai,sigset_t *oldsigset);
 #endif
 
-/* ----- Declarations from "audio_esd.c"  ------ */
-extern char *esdserver;
-
-
+extern void readers_pushback_header(struct reader *rds,unsigned long aLong);
+extern void readers_mark_pos(struct reader *rds);
+extern void readers_goto_mark(struct reader *rds);
 
 
 /* ------ Declarations from "httpget.c" ------ */
@@ -196,6 +296,8 @@ extern char *httpauth;
 
 /* ------ Declarations from "common.c" ------ */
 
+int sync_stream(struct reader *rds,struct frame *fr,int flags,int *skipped);
+
 extern void audio_flush(int, struct audio_info_struct *);
 extern void (*catchsignal(int signum, void(*handler)()))();
 
@@ -205,25 +307,20 @@ extern void print_id3_tag(unsigned char *buf);
 
 extern int split_dir_file(const char *path, char **dname, char **fname);
 
-extern unsigned int   get1bit(void);
-extern unsigned int   getbits(int);
-extern unsigned int   getbits_fast(int);
-extern void           backbits(int);
-extern int            getbitoffset(void);
-extern int            getbyte(void);
+extern unsigned int   get1bit(struct bitstream_info *);
+extern unsigned int   getbits(struct bitstream_info *,int);
+extern unsigned int   getbits_fast(struct bitstream_info *,int);
+extern void           backbits(struct bitstream_info *,int);
+extern int            getbitoffset(struct bitstream_info *);
+extern int            getbyte(struct bitstream_info *);
 
-extern void set_pointer(long);
+extern void set_pointer(int,long);
 
 extern unsigned char *pcm_sample;
 extern int pcm_point;
 extern int audiobufsize;
 
 extern int OutputDescriptor;
-
-#ifdef VARMODESUPPORT
-extern int varmode;
-extern int playlimit;
-#endif
 
 struct gr_info_s {
       int scfsi;
@@ -255,20 +352,17 @@ struct III_sideinfo
   } ch[2];
 };
 
-extern void open_stream(char *,int fd);
-extern void read_frame_init (void);
-extern int read_frame(struct frame *fr);
-extern void play_frame(int init,struct frame *fr);
-extern int do_layer3(struct frame *fr,int,struct audio_info_struct *);
-extern int do_layer2(struct frame *fr,int,struct audio_info_struct *);
-extern int do_layer1(struct frame *fr,int,struct audio_info_struct *);
+extern struct reader *open_stream(char *,int fd);
+extern void read_frame_init (struct frame *fr);
+extern int read_frame(struct reader *rd,struct frame *fr);
+extern int play_frame(struct mpstr *mp,int init,struct frame *fr);
+extern int do_layer3(struct mpstr *mp,struct frame *fr,int,struct audio_info_struct *);
+extern int do_layer2(struct mpstr *mp,struct frame *fr,int,struct audio_info_struct *);
+extern int do_layer1(struct mpstr *mp,struct frame *fr,int,struct audio_info_struct *);
 extern void do_equalizer(real *bandPtr,int channel);
 
 #ifdef PENTIUM_OPT
 extern int synth_1to1_pent (real *,int,unsigned char *);
-#endif
-#ifdef USE_3DNOW
-extern int synth_1to1_3dnow (real *,int,unsigned char *);
 #endif
 extern int synth_1to1 (real *,int,unsigned char *,int *);
 extern int synth_1to1_8bit (real *,int,unsigned char *,int *);
@@ -300,11 +394,10 @@ extern int synth_ntom_8bit_mono2stereo (real *,unsigned char *,int *);
 
 extern void rewindNbits(int bits);
 extern int  hsstell(void);
-extern void set_pointer(long);
 extern void huffman_decoder(int ,int *);
 extern void huffman_count1(int,int *);
-extern void print_stat(struct frame *fr,int no,long buffsize,struct audio_info_struct *ai);
-extern int get_songlen(struct frame *fr,int no);
+extern void print_stat(struct reader *rd,struct frame *fr,int no,long buffsize,struct audio_info_struct *ai);
+extern int get_songlen(struct reader *rd,struct frame *fr,int no);
 
 extern void init_layer3(int);
 extern void init_layer2(void);
@@ -312,11 +405,16 @@ extern void make_decode_tables(long scale);
 extern void make_conv16to8_table(int);
 extern void dct64(real *,real *,real *);
 
+#ifdef USE_MMX
+extern void dct64_MMX(short *a,short *b,real *c);
+extern int synth_1to1_MMX(real *, int, short *, short *, int *);
+#endif
+
 extern void synth_ntom_set_step(long,long);
 
-extern void control_generic(struct frame *fr);
-extern void control_sajber(struct frame *fr);
-extern void control_tk3play(struct frame *fr);
+extern void control_generic(struct mpstr *,struct frame *fr);
+extern void control_sajber(struct mpstr *,struct frame *fr);
+extern void control_tk3play(struct mpstr *,struct frame *fr);
 
 extern int cdr_open(struct audio_info_struct *ai, char *ame);
 extern int au_open(struct audio_info_struct *ai, char *name);
@@ -332,15 +430,17 @@ extern int au_close(void);
 extern int cdr_open(struct audio_info_struct *ai, char *cdrfilename);
 extern int cdr_close(void);
 
+extern int getVBRHeader(struct vbrHeader *head,unsigned char *buf, 
+	struct frame *fr);
+
+
 extern unsigned char *conv16to8;
 extern long freqs[9];
 extern real muls[27][64];
-#ifdef USE_3DNOW
-extern real decwin[2*(512+32)];
-#else
 extern real decwin[512+32];
-#endif
+#ifndef USE_MMX
 extern real *pnts[5];
+#endif
 
 extern real equalizer[2][32];
 extern real equalizer_sum[2][32];
@@ -355,5 +455,10 @@ extern struct parameter param;
 extern void dct64_486(int *a,int *b,real *c);
 extern int synth_1to1_486(real *bandPtr,int channel,unsigned char *out,int nb_blocks);
 
-
-
+/* 3DNow! optimizations */
+#ifdef USE_3DNOW
+extern int getcpuflags(void);
+extern void dct36(real *,real *,real *,real *,real *);
+extern void dct36_3dnow(real *,real *,real *,real *,real *);
+extern int synth_1to1_3dnow(real *,int,unsigned char *,int *);
+#endif
